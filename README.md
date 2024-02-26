@@ -1,11 +1,9 @@
-
-<table>
+<table style="border-collapse: collapse; border: none;">
   <tr>
-    <td><img src="./trackio/supporting/logo2.png" alt="trackio logo" style="width: 300px;"/></td>
-    <td><h1><em>trackio</em> - A Python approach to working with spatiotemporal mass movement data</h1></td>
+    <td style="border: none;"><img src="./trackio/supporting/logo2.png" alt="trackio logo" style="width: 300px;"/></td>
+    <td style="border: none;"><h1><em>trackio</em> - A Python approach to working with spatiotemporal mass movement data</h1></td>
   </tr>
-</table
-
+</table>
 
 This is an open source library geared towards working with different kinds of mass movement or trajectory data.
 
