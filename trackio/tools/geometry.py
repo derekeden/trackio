@@ -2,11 +2,12 @@
 
 import numpy as np
 from pyproj import CRS, Geod
-from more_itertools import consecutive_groups
 from .utils import read_pkl, save_pkl, collect_agent_pkls
 import os
 import pandas as pd
 from shapely.geometry import Point, LineString
+from inpoly import inpoly2
+from more_itertools import consecutive_groups
 
 #for dividing by zero in lin alg equations - returns nan
 import warnings
@@ -1513,9 +1514,6 @@ def lateral_distribution(long,
         df = pd.DataFrame()
     return df
 
-from inpoly import inpoly2
-from more_itertools import consecutive_groups
-
 def time_in_polygon(polygon,
                     edges,
                     meta_cols,
@@ -1582,5 +1580,72 @@ def time_in_polygon(polygon,
             row['Distance Travelled'] = distance
             rows.append(row)
     return rows
+
+def generate_flow_map(characteristic_col,
+                      flow_col,
+                      args):
+    #split args
+    pkl_files, tracks = args
+    #read split agent file
+    agent = collect_agent_pkls(pkl_files)
+    #reduce to tracks of interest
+    if len(tracks) > 0:
+        tids = [tid for tid in agent.tracks.keys() 
+                if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks]
+    else:
+        tids = agent.tracks.keys()
+    #loop over each track, route through polygons
+    out = []
+    for tid in tids:
+        track = agent.tracks[tid]
+        if characteristic_col is not None:
+            track = track[track[characteristic_col]].copy()
+        #route through the polygons
+        route = [track[flow_col].values[0]]
+        current = track[flow_col].values[0]
+        for node in track[flow_col].values:
+            if node == current:
+                pass
+            else:
+                route.append(node)
+                current = node
+        #if it never left the same polygon
+        if len(route)==1:
+            route.append(node)
+        #split into dictionary and append to rows
+        for i in range(len(route)-1):
+            a = route[i]
+            b = route[i+1]
+            _out = {'Start':a, 
+                    'End':b, 
+                    'Track ID':agent.track_meta[tid]['Track ID']}
+            out.append(_out)
+    return out
+            
+def reduce_to_flow_map(characteristic_col,
+                       flow_col,
+                       out_pth,
+                       points,
+                       args):
+    #split args
+    pkl_files, tracks = args
+    #read split agent file
+    agent = collect_agent_pkls(pkl_files)
+    #reduce to tracks of interest
+    if len(tracks) > 0:
+        tids = [tid for tid in agent.tracks.keys() 
+                if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks]
+    else:
+        tids = agent.tracks.keys()
+    #loop over each track, route through polygons
+    for tid in tids:
+        track = agent.tracks[tid]
+        track = track[track[characteristic_col]].copy()
+        track.loc[:,'X'] = track[flow_col].apply(lambda x: points.get(x)[0])
+        track.loc[:,'Y'] = track[flow_col].apply(lambda x: points.get(x)[1])
+        agent.tracks[tid] = track.reset_index(drop=True)
+    #save the agent back
+    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    save_pkl(out_file, agent) 
             
 ################################################################################

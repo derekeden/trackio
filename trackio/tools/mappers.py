@@ -351,7 +351,7 @@ def make_col_mapper(files, ncores=1, fill_mapper={}):
     #flatten and get unique only
     cols = np.unique(flatten(cols))
     #match standard columns
-    vals = list(map(lambda x: fill_mapper.get(x, ''), cols))
+    vals = list(map(lambda x: fill_mapper.get(x, x), cols))
     #return mapper
     return dict(zip(cols, vals))
 

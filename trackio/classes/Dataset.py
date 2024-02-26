@@ -1529,6 +1529,83 @@ class Dataset:
         df = pd.DataFrame(rows)
         return df
     
+    def generate_flow_map(self,
+                          polygons,
+                          characteristic_col=None,
+                          flow_col='Graph Node',
+                          agents=None,
+                          tracks=None,
+                          ncores=1,
+                          desc='Generating flow map from polygons'):
+        #make sure it is proper format
+        msg = 'Polygons must be gp.GeoDataFrame with Code, X, Y columns'
+        assert isinstance(polygons, gp.GeoDataFrame), msg
+        assert all([c in polygons.columns for c in ['Code','X','Y']]), msg
+        #get the files to process
+        pkl_groups = list(zip(*self.get_files_tracks_to_process(agents, tracks)))
+        #compute in parallel
+        rows = utils.pool_caller(geometry.generate_flow_map,
+                                (characteristic_col, 
+                                 flow_col),
+                                pkl_groups,
+                                desc,
+                                ncores)
+        #flatten and convert to dataframe
+        rows = utils.flatten(rows)
+        df = pd.DataFrame(rows)
+        df = df.groupby(['Start', 'End']).agg(list)
+        df['Volume'] = df['Track ID'].apply(len)
+        #add the linestrings
+        keys = polygons['Code'].values
+        vals = polygons[['X','Y']].values
+        points = dict(zip(keys, vals))
+        geo = []
+        for idx in df.index:
+            line = LineString([points[idx[0]], points[idx[1]]])
+            geo.append(line)
+        #turn to gdf
+        gdf = gp.GeoDataFrame(df, geometry=geo, crs=polygons.crs)
+        #add some properties
+        gdf['Length'] = gdf.geometry.length
+        dx = gdf.geometry.apply(lambda x: x.coords[-1][0] - x.coords[0][0])
+        dy = gdf.geometry.apply(lambda x: x.coords[-1][1] - x.coords[0][1])
+        gdf['Direction'] = np.degrees(np.arctan2(dx, dy)) % 360
+        return gdf.reset_index()
+
+    def reduce_to_flow_map(self,
+                          polygons,
+                          characteristic_col='Characteristic',
+                          flow_col='Graph Node',
+                          agents=None,
+                          tracks=None,
+                          ncores=1,
+                          out_pth=None,
+                          desc='Generating flow map from polygons'):
+        #set out path
+        out_pth = self.set_out_pth(out_pth)
+        #make sure it is proper format
+        msg = 'Polygons must be gp.GeoDataFrame with Code, X, Y columns'
+        assert isinstance(polygons, gp.GeoDataFrame), msg
+        assert all([c in polygons.columns for c in ['Code','X','Y']]), msg
+        #get the files to process
+        pkl_groups = list(zip(*self.get_files_tracks_to_process(agents, tracks)))
+        #make point lookup
+        keys = polygons['Code'].values
+        vals = polygons[['X','Y']].values
+        points = dict(zip(keys, vals))
+        #compute in parallel
+        utils.pool_caller(geometry.reduce_to_flow_map,
+                        (characteristic_col, 
+                        flow_col,
+                        out_pth,
+                        points),
+                        pkl_groups,
+                        desc,
+                        ncores)
+        #update meta
+        self.update_meta(out_pth, self.meta)
+        return self
+             
     # def flow_map(self):
     #     #implement that paper 
     #     pass

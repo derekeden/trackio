@@ -1,4 +1,5 @@
 DEV/*
 notebooks/*
 trackio/supporting/*.pdf
-README.md
+*.gpkg
+*.gpkg

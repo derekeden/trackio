@@ -414,7 +414,7 @@ def gen_track_meta(tdf):
         # "Max Acceleration": tdf['Acceleration'].max(),
         # "Max Decceleration": tdf['Acceleration'].min(),
         # "Max Turning Rate": tdf['Turning Rate'].max(),
-        "Min Temporal Resolution": np.nanmean(dts) if len(dts) > 0 else 0,
+        "Min Temporal Resolution": np.nanmin(dts) if len(dts) > 0 else 0,
         "Mean Temporal Resolution": np.nanmean(dts) if len(dts) > 0 else 0,
         "Max Temporal Resolution": np.nanmax(dts) if len(dts) > 0 else 0,
         "Min Spatial Resolution": np.nanmin(dxs) if len(dxs) > 0  else 0,

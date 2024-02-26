@@ -1,8 +1,8 @@
 <p align="left">
-<img src="./aisio/supporting/icon.png" alt="sidepanel" width="150"  style="display: block; margin-right: auto;">
+<img src="./trackio/supporting/logo.png" alt="sidepanel" width="150"  style="display: block; margin-right: auto;">
 </p>
 
-# aisio - A Python approach to working with AIS datasets
+# trackio - A Python approach to working with spatiotemporal mass movement data
 
 This is an open source library geared towards working with AIS data in CSV/feather format. `aisio` natively supports Marine Cadastre (https://marinecadastre.gov/data/) and many other AIS supplier formats, and has functionality to extend support to any supplier format (see step03 in `notebooks`).
 
