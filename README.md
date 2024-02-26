@@ -8,7 +8,7 @@ This is an open source library geared towards working with different kinds of ma
 
 Examples include data from vessels, planes, cars, animal migrations, Agent Based Modelling output, hurricane paths, etc. Anything that contains movements stored in spatiotemporal (X, Y, Time) point format. 
 
-Below is an example of such data from an AIS vessel dataset.
+Below is an example of such data from an AIS vessel dataset:
 
 ![AIS_DATA](./trackio/supporting/readme_data.png)
 
