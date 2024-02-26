@@ -1,9 +1,8 @@
-<table>
-  <tr>
-    <td><img src="./trackio/supporting/logo2.png" alt="trackio logo" style="width: 300px; border: none;"/></td>
-    <td><h1><em>trackio</em> - A Python approach to working with spatiotemporal mass movement data</h1></td>
-  </tr>
-</table
+<p align="left">
+<img src="./trackio/supporting/logo2.png" alt="sidepanel" width="150"  style="display: block; margin-right: auto;">
+</p>
+
+# *trackio* - A Python approach to working with spatiotemporal mass movement data
 
 This is an open source library geared towards working with different kinds of mass movement or trajectory data.
 
@@ -170,15 +169,3 @@ Input / Output
 There are a series of Jupyter notebooks available in the `notebooks` folder.
 
 The example notebooks showcase the full range of functionality for the library.
-
-
-
-
-
-<p align="left">
-<img src="./trackio/supporting/logo2.png" alt="sidepanel" width="150"  style="display: block; margin-right: auto;">
-</p>
-
-# *trackio* - A Python approach to working with spatiotemporal mass movement data
-
-
