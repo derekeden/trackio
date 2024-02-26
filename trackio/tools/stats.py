@@ -19,7 +19,7 @@
 #     beams = pd.concat([beams,_beams])
 #     stats = beams.groupby('Type')['Width'].agg(list).apply(lambda x: pd.Series(x).describe())
 #     return stats
-   
+   #
 # def vessel_length_stats(dataset, agents=None):
 #     if agents is None:
 #         agents = dataset.agents

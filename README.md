@@ -1,39 +1,50 @@
 <p align="left">
-<img src="./trackio/supporting/logo.png" alt="sidepanel" width="150"  style="display: block; margin-right: auto;">
+<img src="./trackio/supporting/logo2.png" alt="sidepanel" width="150"  style="display: block; margin-right: auto;">
 </p>
 
-# trackio - A Python approach to working with spatiotemporal mass movement data
+# *trackio* - A Python approach to working with spatiotemporal mass movement data
 
-This is an open source library geared towards working with AIS data in CSV/feather format. `aisio` natively supports Marine Cadastre (https://marinecadastre.gov/data/) and many other AIS supplier formats, and has functionality to extend support to any supplier format (see step03 in `notebooks`).
+This is an open source library geared towards working with different kinds of mass movement or trajectory data.
 
-If you are working with a raw AIS data feed (such as Spire), it is suggested to first use the [pyais](https://github.com/M0r13n/pyais) library to convert the raw NMEA AIS messages to a CSV/feather format. Then you can operate on the data using `aisio`.
+Examples include data from vessels, planes, cars, animal migrations, Agent Based Modelling output, hurricane paths, etc. Anything that contains movements stored in spatiotemporal (X, Y, Time) point format.
 
-This library grew out of necessity over the years and already contains many useful tools applicable to commerical/research applications. If you are doing typical processing of AIS data for work or research, there is a good chance it already does what you need. Just follow the workflow steps in the `notebooks` folder. If the functionality doesn't already exist, there is a good chance it can be easily integrated to leverage the `aisio` framework.
+![AIS_DATA](./trackio/supporting/readme_data.png)
 
-Unlike other similar libraries, `aisio` was designed for arbitrary sized datasets with arbitrary computational resources. I.e., if you have a huge amount of data and a modest machine with CPU/RAM limitations, this library will still work!!
+This library contains functionality to help ingest, clean/repair, perform I/O conversions, process, and visualize mass movement data. The library is able to natively ingest data in formats such as:
 
-`aisio` also has heavy operations coded in parallel to leverage powerful machines for faster analyses on large datasets.
+* CSV and other ASCII files
+* Feather files
+* Pandas DataFrames
+* GeoPandas GeoDataFrames
+
+And is extendable to any new dataset that hasn't been seen by the library before.
+
+Unlike other similar libraries, `trackio` was designed for arbitrary sized datasets with arbitrary computational resources. I.e., if you have a huge amount of data spread across hundreds of files with different column names, and a modest machine with CPU/RAM limitations, this library will still work!
+
+`trackio` also has heavy operations coded in parallel to leverage powerful machines for faster analyses on large datasets. As well, `trackio` is interoperable with Dask bags, so the sky is the limit in terms of custom functionality and processing.
 
 ## Table of Contents
 
 <!--ts-->
    * [Installation](#installation)
+   * [Overall Structure](#overall-structure)
    * [Functionality](#functionality)
    * [Examples](#examples)
 <!--te-->
 
 ## Installation
 
+This library works on Windows (including WSL2) and Linux.
 
-This library has been tested with Python versions 3.9, and 3.10.
+This library was written using Python 3.10, it is recommended to use this version. It has not been tested on other versions.
 
-This library works on Window and Linux. This library requires gdal >= 3.5.1, thus creating an environment is a good idea.
+This library requires `gdal` >= 3.5.1 and `Cython` libraries, thus creating an environment is recommended.
 
-If using Anaconda/Miniconda, run this from the `aisio` folder:
+If using Anaconda/Miniconda, run this from the `trackio` folder **in this order**:
 
-`conda create -n ais python=3.9`    or  `conda create -n ais python=3.10`
+`conda create -n trackio python=3.10`
 
-`conda activate ais`
+`conda activate trackio`
 
 `conda install -c conda-forge gdal`
 
@@ -41,84 +52,121 @@ If using Anaconda/Miniconda, run this from the `aisio` folder:
 
 `conda install -c conda-forge geopandas`
 
-`pip install git+https://github.com/dengwirda/inpoly-python` (might need to download Visual Studio C++ Dev Tools for Windows, the link will be in the error)
+`pip install ./trackio/supporting/inpoly-python-0.2.0.zip` (might need to download Visual Studio C++ Dev Tools for Windows; the link will be in the error, just follow the instructions to install)
 
 `pip install .` 
 
-Or, just use pip if you are not using Anaconda/Miniconda.
+## Overall Structure
+
+The `trackio` library is structured in a way where the `Dataset` is the main class object. The `Dataset` object is a custom class object that contains references to stored data, as well as a series of attributes and methods that make it easy to operate on the data. 
+
+The `Agent` class is a custom class object that represents a single agent in the `Dataset`. This contains all the data pertaining to one vessel, one animal, one car, etc. All of the spatiotemporal track data is stored in individual `Agent` class objects. Each `Agent` class object is stored in its own binary file once the raw data is split up. 
+
+The actual tracks associated with any given vessel are simply stored as pandas DataFrames in the `Agent.tracks` attribute. The `Agent.tracks` property is a dictionary containing *Track ID, Track DataFrame* key, value pairs.
+
+The `Dataset` keeps all of the data in a user-specified folder, along with `dataset.db`, `agent.db`, and `track.db` files. The various `.db` files contain metadata about the overall dataset, agents, and tracks contained in the `Dataset`.
+
+This is illustrated in the below figure:
+
+![STRUCTURE](./trackio/supporting/readme_structure.png)
+
+The `dataset.db` file contains metadata about the actual `Dataset` in its entirety:
+
+![DATASET](./trackio/supporting/readme_datasetdb.png)
+
+The `agent.db` file contains a GeoPandas GeoDataFrame of metadata about all of the agents in the `Dataset`. The geometry column of the GeoDataFrame contains bounding boxes for each agent:
+
+![AGENT](./trackio/supporting/readme_agentdb.png)
+
+Similarly, the `track.db` file contains the same information, but for each track in the `Dataset`:
+
+![TRACK](./trackio/supporting/readme_trackdb.png)
+
+These are essentially used as tables with metadata about the track data, which you to filter/query/operate on the track data much faster.
 
 ## Functionality
 
+The below provides a bullet list of the various functionality that is included in this library, for more information and detailed examples, please refer to [Examples](#examples):
 
-The library is extensible to any AIS supplier dataset. As new data is encountered that `aisio` cannot read, QC functions can be ran to map the new data to `aisio` standards. This allows `aisio` to auto-detect this data format in the future. It also allows `aisio` to verify all the data can be read before it even is read, as with large datasets it can often take a long time to process. Nothing is worse than processing data for 24 hours, only to find it crashed on the 2nd last file because there was a random comma in a column name.
+Data Ingestion
+* From CSV and other pandas friendly ASCII files
+* From Feather format
+* From pandas DataFrame containing points
+* From GeoPandas GeoDataFrame containing LineStrings of trajectories
 
-The mappings are in JSON files in the supporting folder. The standard mappings used for the AIS data columns are as follows:
+Data Clipping
+* Clipping raw data to polygon or bounding box prior to ingestion
 
-```python
-#Standard Raw AIS Data Column Names
+Column and Data Field Mapping
+* Scanning and mapping raw data columns to standard names
+* Extension of standard name mapper to handle any new format of data automatically
+* Scanning of unique data fields across all files in dataset
+* Mapping of data fields to custom values during data ingestion (e.g. converting text descriptions to integer codes)
+* Generation of new static/dynamic fields by mapping existing data fields (e.g. adding a L/M/H speed description based on object speed)
 
-['Time',        #timestamp of ais ping
- 'X',           #x-coordinate of vessel at ais ping
- 'Y',           #y-coordinate of vessel at ais ping
- 'Draft',       #draft of vessel at ais ping
- 'Name',        #name of vessel
- 'MMSI',        #MMSI identifier for vessel
- 'IMO',         #IMO identifier for vessel
- 'AISCode',     #ais code for vessel
- 'Coursing',    #coursing of vessel at  ais ping
- 'Heading',     #heading of vessel at  ais ping
- 'Turning Rate',#turning rate of vessel at ais ping
- 'Speed',       #speed of vessel at  ais ping
- 'Length',      #length of vessel (LOA)
- 'Width',       #width of vessel (beam)
- 'Status']      #navigational status of vessel at ping
+Splitting Points into Tracks
+* Spatiotemporal threshold based splitting
+* Modified spatiotemporal threshold splitting to handle duplicated agent identifier (e.g. MMSI for AIS vessels)
+* K-Means based clustering and splitting of points into tracks
+* DBSCAN based clustering and splitting of points into tracks
+* Splitting of tracks into sub-tracks based on data fields (e.g. splitting a track into sub-tracks where splits occur at major stops)
+* Reconnecting "bad" splits caused by erroneous data
 
-```
+![SPLITTING](./trackio/supporting/readme_pointsplitting.png)
 
-`aisio` uses standard navigational status codes, as described here:
+Processing
+* Reprojection to different CRS
+* Spatial/temporal resampling
+* Interpolation to dataset-wide global time axis
+* Computation of track coursing
+* Computation of track turning rate
+* Computation of track speed
+* Computation of track acceleration
+* Smoothing of sharp corners
+* Decimation/simplification of tracks
+* Simplification of track stops
+* Imprinting geometry into tracks
+* Interpolating raster data onto tracks
+* Routing tracks through "cost rasters"
 
-[NavStatus Codes Explained](https://help.marinetraffic.com/hc/en-us/articles/203990998-What-is-the-significance-of-the-AIS-Navigational-Status-Values-)
+Analysis
+* Extraction of characteristic tracks
+* Computation of encounters between tracks
+* Computation of track intersections
+* Computation of closest encounter distance to object(s)
+* Computation of closest encounters between tracks
+* Computation distance proximity distributions between tracks
+* Extraction of lateral position distributions along tracks
+* Extraction of arbitrary data distributions along tracks
+* Time spent inside polygon(s)
+* Generation of unstructured graphs (flow maps) from track data
 
-`aisio` also utilizes standard AIS code mappings, which are available in the support folder, and shown here:
+Classification
 
-[AIS Codes Explained](https://coast.noaa.gov/data/marinecadastre/ais/VesselTypeCodes2018.pdf)
+Another unique aspect of `trackio` is the ability to "classify" points along a track. This means to assess some `True` or `False` condition at each point along a track. This could represent if an agent in inside a polygon, above a given speed threshold, stopped, turning, etc. 
 
-The idea is that, regardless of how the data comes in, `aisio` will be able to map it to these standard formats and ingest it.
+This is illustrated in the below image:
 
-The library operates by using three main classes: DataSet, Vessel, and Track. The DataSet class wraps over your entire AIS dataset. This DataSet object holds a list of raw data files and has the ability to perform various QC and processing functions. 
+![CLASSIFYING](./trackio/supporting/readme_classify.png)
 
-Once the DataSet class object is processed, it will contain a series of Vessel class objects (one for each unique vessel in the DataSet), and each Vessel object will contain a series of Track class objects (one for each unique track associated with each Vessel).
+When leveraged, this information can be extremely valuable for performing multi-layered filtering and conditional operations. For example, one could use this information to find vessel tracks that turned inside of a specific polygon that wasn't the home or destination port.
 
-Pings are grouped by vessel identifiers (usually MMSI), and then split into tracks using a spatial and temporal threshold, for example here using a 50km space and 12hr time threshold:
+As track data is classified, the metadata tables are updated. This way you can use these classifications as part of filters later on to select or process the data further.
 
-![AIS_TRACK](./aisio/supporting/ais_track.png)
-
-Once the pings have been grouped and split into tracks, two metadata file are then populated and saved for easier reaccess. These metadata files contain a wealth of information on each vessel and track in the dataset, which allows you to easily query and filter data of interest.
-
-Furthermore, a novel part of `aisio` is how tracks can be classified. Along any given track, each point will have a navigational status code as explained above. These codes tell you what the vessel was doing at that time. `aisio` includes a number of classification methods to further classify and add codes to the points. This feature of `aisio` opens up the door to classify points/tracks/vessels using any algorithm, and still leverage the `aisio` framework.
-
-For example, you can classify tracks that enter polygons, tracks where speed thresholds are met or not, tracks that travel a pre-defined trip, where tracks are mooring, where tracks are turning, etc. The sky is the limit for classification, and you can combine all the classifications for advanced analyses!
-
-The below diagram provides a visual example of this functionality:
-
-![DATA](./aisio/supporting/data.png)
-
-
-As the data is classified, the metadata tables are updated. This way you can use these classifications as part of filters later on to select or process the data further.
-
-There are a number of I/O operations to convert the DataSet to GeoDataFrames, DataFrames, CSV files, GIS formats, rasters, etc. As well, there are a number of built in statistics functions to output key information about the data contained in the DataSet.
-
-![RASTER](./aisio/supporting/raster.png)
+Input / Output
+* Pandas DataFrame
+* GeoPandas GeoDataFrame, 1 feature for each track
+* GeoPandas GeoDataFrame, 1 feature for each segment
+* Dask bag for custom processing
+* Rasterized track counts
+* Rasterized track attributes (e.g. time spent in pixel)
+* Representative unstructured graph
 
 ## Examples
 
 There are a series of Jupyter notebooks available in the `notebooks` folder.
 
-These are broken into a series of steps. Each (or all) of these steps are the typical workflow that you would follow to obtain/process/analyze AIS data for any type of application. These notebooks cover the full range of functionality in the library.
-
-## Coming Soon
-
-Notebooks of simple analyses using ideas from Step1-10 notebooks.
+The example notebooks showcase the full range of functionality for the library.
 
 
 

@@ -3,3 +3,5 @@ notebooks/*
 trackio/supporting/*.pdf
 *.gpkg
 *.gpkg
+trackio/tools/stats.py
+trackio/tools/ais.py
