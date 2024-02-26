@@ -90,23 +90,23 @@ These are essentially used as tables with metadata about the track data, which y
 
 The below provides a bullet list of the various functionality that is included in this library, for more information and detailed examples, please refer to [Examples](#examples):
 
-Data Ingestion
+### Data Ingestion
 * From CSV and other pandas friendly ASCII files
 * From Feather format
 * From pandas DataFrame containing points
 * From GeoPandas GeoDataFrame containing LineStrings of trajectories
 
-Data Clipping
+### Data Clipping
 * Clipping raw data to polygon or bounding box prior to ingestion
 
-Column and Data Field Mapping
+### Static / Dynamic Data Field Mapping
 * Scanning and mapping raw data columns to standard names
 * Extension of standard name mapper to handle any new format of data automatically
 * Scanning of unique data fields across all files in dataset
 * Mapping of data fields to custom values during data ingestion (e.g. converting text descriptions to integer codes)
 * Generation of new static/dynamic fields by mapping existing data fields (e.g. adding a L/M/H speed description based on object speed)
 
-Splitting Points into Tracks
+### Splitting Points into Tracks
 * Spatiotemporal threshold based splitting
 * Modified spatiotemporal threshold splitting to handle duplicated agent identifier (e.g. MMSI for AIS vessels)
 * K-Means based clustering and splitting of points into tracks
@@ -116,7 +116,7 @@ Splitting Points into Tracks
 
 ![SPLITTING](./trackio/supporting/readme_pointsplitting.png)
 
-Processing
+### Processing
 * Reprojection to different CRS
 * Spatial/temporal resampling
 * Interpolation to dataset-wide global time axis
@@ -131,7 +131,7 @@ Processing
 * Interpolating raster data onto tracks
 * Routing tracks through "cost rasters"
 
-Analysis
+### Analysis
 * Extraction of characteristic tracks
 * Computation of encounters between tracks
 * Computation of track intersections
@@ -143,7 +143,7 @@ Analysis
 * Time spent inside polygon(s)
 * Generation of unstructured graphs (flow maps) from track data
 
-Classification
+### Classification
 
 Another unique aspect of `trackio` is the ability to "classify" points along a track. This means to assess some `True` or `False` condition at each point along a track. This could represent if an agent in inside a polygon, above a given speed threshold, stopped, turning, etc. 
 
@@ -155,7 +155,7 @@ When leveraged, this information can be extremely valuable for performing multi-
 
 As track data is classified, the metadata tables are updated. This way you can use these classifications as part of filters later on to select or process the data further.
 
-Input / Output
+### Input / Output
 * Pandas DataFrame
 * GeoPandas GeoDataFrame, 1 feature for each track
 * GeoPandas GeoDataFrame, 1 feature for each segment
