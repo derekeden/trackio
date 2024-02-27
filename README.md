@@ -1,8 +1,6 @@
 <p align="left">
-<img src="./trackio/supporting/logo2.png" alt="sidepanel" width="150"  style="display: block; margin-right: auto;">
+<img src="./trackio/supporting/logo3.png" alt="sidepanel" style="display: block; margin-right: auto;">
 </p>
-
-# *trackio* - A Python approach to working with spatiotemporal mass movement data
 
 This is an open source library geared towards working with different kinds of mass movement or trajectory data.
 
