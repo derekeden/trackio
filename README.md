@@ -160,6 +160,6 @@ As track data is classified, the metadata tables are updated. This way you can u
 
 ## Examples
 
-There are a series of Jupyter notebooks available in the `notebooks` folder.
+There are a series of Jupyter notebooks available in the [notebooks](#https://github.com/derekeden/trackio/tree/main/notebooks) folder.
 
 The example notebooks showcase the full range of functionality for the library.
