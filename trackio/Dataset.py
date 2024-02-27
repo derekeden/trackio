@@ -817,7 +817,8 @@ class Dataset:
         #process in parallel
         with mp.Pool(ncores) as pool:
             out = pool.map(utils.collect_agent_pkls, tqdm(files, 
-                                                          total=len(files)))
+                                                          total=len(files),
+                                                          colour='GREEN'))
         return out
     
     #get one track
@@ -833,7 +834,9 @@ class Dataset:
         files = [self.file_mapper['Tracks'][a] for a in aids]
         #process in parallel
         with mp.Pool(ncores) as pool:
-            out = pool.map(utils.read_pkl, tqdm(files, total=len(files)))
+            out = pool.map(utils.read_pkl, tqdm(files, 
+                                                total=len(files), 
+                                                colour='GREEN'))
         #collect tracks
         out_tracks = []
         for ves in out:

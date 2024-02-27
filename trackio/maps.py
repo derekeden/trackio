@@ -347,7 +347,8 @@ def make_col_mapper(files, ncores=1, fill_mapper={}):
         cols = pool.map(_make_col_mapper, 
                         tqdm(files, 
                              total=len(files), 
-                             desc='Making column mapper'))
+                             desc='Making column mapper',
+                             colour='GREEN'))
     #flatten and get unique only
     cols = np.unique(flatten(cols))
     #match standard columns
@@ -404,7 +405,8 @@ def make_raw_data_mapper(files,
         _out = pool.map(func, 
                         tqdm(files, 
                              total=len(files), 
-                             desc='QCing data columns'))
+                             desc='QCing data columns',
+                             colour='GREEN'))
     #reformat into key:list dict
     out = flatten_dict_unique(_out)
     #convert list to raw:mapped dict
