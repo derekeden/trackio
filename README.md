@@ -2,6 +2,8 @@
 <img src="./trackio/supporting/logo3.png" alt="sidepanel" style="display: block; margin-right: auto;">
 </p>
 
+---
+
 This is an open source library geared towards working with different kinds of mass movement or trajectory data.
 
 Examples include data from vessels, planes, cars, animal migrations, Agent Based Modelling output, hurricane paths, etc. Anything that contains movements stored in spatiotemporal (X, Y, Time) point format. 
