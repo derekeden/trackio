@@ -1,13 +1,13 @@
 ################################################################################
 
-from .classes.Dataset import Dataset
-from .classes.Agent import Agent
-from .tools.io import rasterize, create_blank_raster
-from .tools.utils import read_pkl as read_agent
-from .tools.utils import save_pkl as write_agent
-from .tools.processing import clip_to_polygon, clip_to_box
-from .tools.mappers import _mappers as mappers
-from .tools.mappers import make_col_mapper, make_raw_data_mapper
+from .Dataset import Dataset
+from .Agent import Agent
+from .io import rasterize, create_blank_raster
+from .utils import read_pkl as read_agent
+from .utils import save_pkl as write_agent
+from .process import clip_to_polygon, clip_to_box
+from .maps import _mappers as mappers
+from .maps import make_col_mapper, make_raw_data_mapper
 
 ################################################################################
 

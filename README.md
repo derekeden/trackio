@@ -40,23 +40,17 @@ This library works on Windows (including WSL2) and Linux.
 
 This library was written using Python 3.10, it is recommended to use this version. It has not been tested on other versions.
 
-This library requires `gdal` >= 3.5.1 and `Cython` libraries, thus creating an environment is recommended.
+This library uses specific `GDAL` and `rasterio` wheels, so it's recommended to create a fresh environment.
 
-If using Anaconda/Miniconda, run this from the `trackio` folder **in this order**:
+If using Anaconda/Miniconda, run this from the `trackio` folder:
 
 `conda create -n trackio python=3.10`
 
 `conda activate trackio`
 
-`conda install -c conda-forge gdal`
-
-`conda install -c conda-forge rasterio`
-
-`conda install -c conda-forge geopandas`
-
-`pip install ./trackio/supporting/inpoly-python-0.2.0.zip` (might need to download Visual Studio C++ Dev Tools for Windows; the link will be in the error, just follow the instructions to install)
-
 `pip install .` 
+
+**Please note for the `inpoly` library, it requires Visual Studio C++ Dev Tools for Windows. If you don't have it already, the link will be in the error message, just follow the instructions to download then redo the trackio installation.**
 
 ## Overall Structure
 
