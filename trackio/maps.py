@@ -390,13 +390,12 @@ def _make_raw_data_mapper(data_col, col_mapper, file):
 def make_raw_data_mapper(files,
                          col_mapper=_mappers.columns,
                          data_col=['Status','AISCode'],
-                         fill_mapper={'Status': _mappers.ais['Status'],
-                                      'AISCode': _mappers.ais['AISCode']},
+                         fill_mapper={},
                          ncores=4):
     #if only one column
     if isinstance(data_col, str):
-        data_col = [data_col]
         fill_mapper = {data_col:fill_mapper}
+        data_col = [data_col]
     #get list of unique values for each attribute/column
     with mp.Pool(ncores) as pool:
         func = partial(_make_raw_data_mapper,
