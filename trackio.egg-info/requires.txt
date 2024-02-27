@@ -1,0 +1,12 @@
+Cython
+numpy
+scipy
+pandas
+geopandas
+tqdm
+more_itertools
+pyproj
+beautifulsoup4
+scikit-learn
+kneed
+dask

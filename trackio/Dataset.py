@@ -536,7 +536,7 @@ class Dataset:
         return meta
     
     def refresh_meta(self, 
-                     overwrite=True, 
+                     agents_only=False, 
                      ncores=1,
                      desc='Refreshing metadata'):
         #process metadata in parallel
@@ -544,7 +544,7 @@ class Dataset:
         #assert there's even data
         assert len(iterable) > 0, f'No point or track files in {self.data_path}'
         meta_metacols_datacols = utils.pool_caller(_refresh_meta,
-                                                    (overwrite,),
+                                                    (agents_only,),
                                                     iterable,
                                                     desc,
                                                     ncores)
@@ -1899,7 +1899,7 @@ def _meta_to_tracks(meta, crs):
     df = gp.GeoDataFrame(df, geometry=_geometry, crs=crs)
     return df
 
-def _refresh_meta(overwrite, file):
+def _refresh_meta(agents_only, file):
     #make a new meta dict and track_meta dict
     meta = {}
     track_meta = {}
@@ -1919,7 +1919,7 @@ def _refresh_meta(overwrite, file):
     meta[v.agent_meta['Agent ID']] = v.agent_meta
     meta[v.agent_meta['Agent ID']]['Tracks'] = track_meta
     #if tracks not split, pings exist in pickle chunks - don't overwrite
-    if overwrite:
+    if not agents_only:
         utils.save_pkl(file, v)
     meta_cols = list(v.meta.keys())
     data_cols = v.data.columns.tolist()
