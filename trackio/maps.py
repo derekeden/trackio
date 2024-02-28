@@ -247,13 +247,13 @@ def map_agent_data_to_codes(inp,
                         m = mapper[i]
                         if i in tdf.columns:
                             mapped = tdf[i].apply(lambda x: m.get(x,fill)).values #fill if missing 
-                            for val in m.values():
+                            for val in set(m.values()):
                                 tdf[f'Code{val}'] = (mapped == val)
                             if drop:
                                 tdf.pop(i)
                         else:
                             mapped = np.array([fill]*len(tdf))
-                            for val in m.values():
+                            for val in set(m.values()):
                                 tdf[f'Code{val}'] = (mapped == val)
                     agent.tracks[tid] = tdf
             #unsplit file
@@ -262,13 +262,13 @@ def map_agent_data_to_codes(inp,
                     m = mapper[i]
                     if i in agent._data.columns:
                         mapped = agent._data[i].apply(lambda x: m.get(x,fill)).values #-1 if missing 
-                        for val in m.values():
+                        for val in set(m.values()):
                             agent._data[f'Code{val}'] = (mapped == val)
                         if drop:
                             agent._data.pop(i)
                     else:
                         mapped = np.array([fill]*len(tdf))
-                        for val in m.values():
+                        for val in set(m.values()):
                             agent._data[f'Code{val}'] = (mapped == val)
             #write it back out
             out_file = f'{out_pth}/{os.path.basename(pkl_file)}'

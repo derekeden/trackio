@@ -605,13 +605,13 @@ class Dataset:
         #reduce to unique dictionary
         out = utils.flatten_dict_unique(_out)
         #turn into blank mapper
-        maps = [{k:None for k in out[key]} for key in inp]
+        mappers = [{k:None for k in out[key]} for key in inp]
         #if single mapper just return it
-        if len(maps) == 1:
-            return maps[0]
+        if len(mappers) == 1:
+            return mappers[0]
         #otherwise nested dict
         else:
-            return dict(zip(inp, maps))
+            return dict(zip(inp, mappers))
 
     def drop_meta(self, 
                   inp,
@@ -690,12 +690,12 @@ class Dataset:
         #reduce to unique dictionary
         out = utils.flatten_dict_unique(_out)
         #turn into blank mapper
-        maps = [{k:None for k in out[key]} for key in inp]
+        mappers = [{k:None for k in out[key]} for key in inp]
         #if single mapper just return it
-        if len(maps) == 1:
-            return maps[0]
+        if len(mappers) == 1:
+            return mappers[0]
         else:
-            return dict(zip(inp, maps))
+            return dict(zip(inp, mappers))
     
     def drop_data(self, 
                   inp,
@@ -771,11 +771,11 @@ class Dataset:
         else:
             msg = f'mapper missing one or all of keys: {inp}'
             assert all([i in mapper.keys() for i in inp]), msg
-        #assert all mapper values are integer and unique
-        msg = 'All mapper values must be unique integer codes'
+        #assert all mapper values are integer
+        msg = 'All mapper values must be integer codes'
         for m in mapper.values():
             assert all([isinstance(v, int) for v in m.values()]), msg
-            assert len(np.unique(list(m.values()))) == len(m.values()), msg
+            # assert len(np.unique(list(m.values()))) == len(m.values()), msg
         #check fill value
         assert isinstance(fill, int), 'fill value must be integer'
         #set out path
