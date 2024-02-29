@@ -127,7 +127,7 @@ def classify_turns(rate,
     for tid in tids:
         track = agent.tracks[tid]
         #classify points
-        result = track['Turning Rate'].values >= rate
+        result = np.abs(track['Turning Rate'].values) >= rate
         track.loc[:,f'Code{code}'] = result
     #save the file
     save_pkl(pkl_files[0], agent)

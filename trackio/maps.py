@@ -9,7 +9,7 @@ import os
 import pandas as pd
 import numpy as np
 import multiprocessing as mp
-from tqdm import tqdm
+from tqdm import tqdm; GREEN = "\033[92m"; ENDC = "\033[0m" #for tqdm bar
 from functools import partial
 
 #these are hardcoded
@@ -347,7 +347,7 @@ def make_col_mapper(files, ncores=1, fill_mapper={}):
         cols = pool.map(_make_col_mapper, 
                         tqdm(files, 
                              total=len(files), 
-                             desc='Making column mapper',
+                             desc=GREEN+'Making column mapper'+ENDC,
                              colour='GREEN'))
     #flatten and get unique only
     cols = np.unique(flatten(cols))
@@ -405,7 +405,7 @@ def make_raw_data_mapper(files,
         _out = pool.map(func, 
                         tqdm(files, 
                              total=len(files), 
-                             desc='QCing data columns',
+                             desc=GREEN+'QCing data columns'+ENDC,
                              colour='GREEN'))
     #reformat into key:list dict
     out = flatten_dict_unique(_out)

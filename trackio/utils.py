@@ -12,7 +12,7 @@ from shapely.geometry import (Polygon,
 from pyproj import CRS
 import multiprocessing as mp
 from functools import partial
-from tqdm import tqdm
+from tqdm import tqdm; GREEN = "\033[92m"; ENDC = "\033[0m" #for tqdm bar
 import pandas as pd
 
 ################################################################################
@@ -119,7 +119,7 @@ def pool_caller(func, partials, iterable, desc, ncores):
     #if only 1 core
     out = []
     if ncores == 1:
-        for i in tqdm(iterable, total=len(iterable), desc=desc, colour='GREEN'):
+        for i in tqdm(iterable, total=len(iterable), desc=GREEN+desc+ENDC, colour='GREEN'):
             out.append(map_func(i))
     #if in parallel
     else:
@@ -127,7 +127,7 @@ def pool_caller(func, partials, iterable, desc, ncores):
             out = pool.map(map_func, 
                         tqdm(iterable, 
                              total=len(iterable), 
-                             desc=desc,
+                             desc=GREEN+desc+ENDC,
                              colour='GREEN'))
     return out
 

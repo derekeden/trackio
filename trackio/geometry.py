@@ -480,7 +480,8 @@ def compute_speed(method,
     out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
-def compute_acceleration(out_pth, 
+def compute_acceleration(out_pth,
+                         method, 
                          args):
     #split args
     pkl_files, tracks = args
@@ -492,29 +493,138 @@ def compute_acceleration(out_pth,
                 if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks]
     else:
         tids = agent.tracks.keys()
-    #loop over each track, recompute coursing
+    #loop over each track, recompute acceleration
     for tid in tids:
         track = agent.tracks[tid]
         if len(track) == 1:
-            accel = [np.nan]
+            a = [np.nan]
         else:
-            time = track['Time'].values
-            speed = track['Speed'].values
-            #add acceleration to tdf
-            dt = pd.DataFrame(data={0:time,
-                                    1:pd.Series(time).shift(1).values,
-                                    -1:pd.Series(time).shift(-1).values})
-            ds = pd.DataFrame(data={0:speed,
-                                    1:pd.Series(speed).shift(1).values,
-                                    -1:pd.Series(speed).shift(-1).values})
-            accel1 = (ds[0] - ds[-1]) / (dt[0] - dt[-1]).apply(lambda x: x.total_seconds())
-            accel2 = (ds[1] - ds[0]) / (dt[1] - dt[0]).apply(lambda x: x.total_seconds())
-            accel = (accel1+accel2)/2
-        track.loc[:,'Acceleration'] = accel
+            dt = np.diff(track['Time'].values) / np.timedelta64(1, 's')
+            ds = np.diff(track['Speed'].values)
+            a = ds/dt
+            if method == 'forward':
+                a = np.hstack([a, a[-1:]])
+            elif method == 'backward':
+                a = np.hstack([a[:1], a])
+            else:
+                a1 = np.hstack([a, a[-1:]])
+                a2 = np.hstack([a[:1], a])
+                a = (a1+a2)/2
+        track.loc[:,'Acceleration'] = a
+    #save the agent back
+    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    save_pkl(out_file, agent) 
+
+def compute_distance_travelled(out_pth,
+                               args):
+    #split args
+    pkl_files, tracks = args
+    #read split agent file
+    agent = collect_agent_pkls(pkl_files)
+    #reduce to tracks of interest
+    if len(tracks) > 0:
+        tids = [tid for tid in agent.tracks.keys() 
+                if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks]
+    else:
+        tids = agent.tracks.keys()
+    #loop over each track, recompute acceleration
+    for tid in tids:
+        track = agent.tracks[tid]
+        if len(track) == 1:
+            dist = [0]
+        else:
+            dx = np.diff(track['X'].values)
+            dy = np.diff(track['Y'].values)
+            dr = (dx**2 + dy**2)**0.5
+            dist = np.hstack([[0], np.cumsum(dr)])
+        track.loc[:,'Distance Travelled'] = dist
+    #save the agent back
+    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    save_pkl(out_file, agent) 
+
+def define_circle(p1, p2, p3):
+    """
+    Returns the center and radius of the circle passing the given 3 points.
+    In case the 3 points form a line, returns (None, infinity).
+    """
+    temp = p2[:,0] * p2[:,0] + p2[:,1] * p2[:,1]
+    bc = (p1[:,0] * p1[:,0] + p1[:,1] * p1[:,1] - temp) / 2
+    cd = (temp - p3[:,0] * p3[:,0] - p3[:,1] * p3[:,1]) / 2
+    det = (p1[:,0] - p2[:,0]) * (p2[:,1] - p3[:,1]) - (p2[:,0] - p3[:,0]) * (p1[:,1] - p2[:,1])
+    
+    det = np.where(det < 1.0e-6, np.nan, det)
+    
+    # Center of circle
+    cx = (bc*(p2[:,1] - p3[:,1]) - cd*(p1[:,1] - p2[:,1])) / det
+    cy = ((p1[:,0] - p2[:,0]) * cd - (p2[:,0] - p3[:,0]) * bc) / det
+    
+    radius = np.sqrt((cx - p1[:,0])**2 + (cy - p1[:,1])**2)
+    return radius
+
+def compute_radius_of_curvature(out_pth,
+                                args):
+    #split args
+    pkl_files, tracks = args
+    #read split agent file
+    agent = collect_agent_pkls(pkl_files)
+    #reduce to tracks of interest
+    if len(tracks) > 0:
+        tids = [tid for tid in agent.tracks.keys() 
+                if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks]
+    else:
+        tids = agent.tracks.keys()
+    #loop over each track, recompute acceleration
+    for tid in tids:
+        track = agent.tracks[tid]
+        if len(track) < 3:
+            radius = [np.nan]*len(track)
+        else:
+            p0 = track[['X','Y']].iloc[:-2][['X','Y']].values
+            p1 = track[['X','Y']].iloc[1:-1][['X','Y']].values
+            p2 = track[['X','Y']].iloc[2:][['X','Y']].values
+            radius = define_circle(p0, p1, p2)
+            radius = np.hstack([[np.nan], radius, [np.nan]])
+        track.loc[:,'Radius of Curvature'] = radius
     #save the agent back
     out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
     
+def compute_sinuosity(out_pth,
+                      window,
+                      args):
+    #split args
+    pkl_files, tracks = args
+    #read split agent file
+    agent = collect_agent_pkls(pkl_files)
+    #reduce to tracks of interest
+    if len(tracks) > 0:
+        tids = [tid for tid in agent.tracks.keys() 
+                if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks]
+    else:
+        tids = agent.tracks.keys()
+    #loop over each track, recompute acceleration
+    for tid in tids:
+        track = agent.tracks[tid]
+        if len(track) < window:
+            sin = [np.nan]*len(track)
+        else:
+            sin = []
+            start = int((window-1)/2)
+            end = int(len(track)-((window-1)/2))
+            coords = track[['X','Y']].values
+            for i in range(start, end):
+                istart = i-(int((window-1)/2))
+                iend = i+(int((window-1)/2))+1
+                segment_length = np.sum((np.diff(coords[istart:iend,0])**2 + np.diff(coords[istart:iend,1])**2)**0.5)
+                segment_effective = ((coords[iend-1,0] - coords[istart,0])**2 + (coords[iend-1,1] - coords[istart,1])**2)**0.5
+                _sin = segment_length / segment_effective
+                sin.append(_sin)
+            sin = [np.nan]*int((window-1)/2) + sin + [np.nan]*int((window-1)/2)
+        track.loc[:,'Sinuosity'] = sin
+    #save the agent back
+    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    save_pkl(out_file, agent) 
+
 def smooth_corners(refinements, 
                    out_pth, 
                    args):

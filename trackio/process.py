@@ -13,7 +13,7 @@ from inpoly import inpoly2
 from shapely.geometry import Polygon
 from functools import partial
 import multiprocessing as mp
-from tqdm import tqdm
+from tqdm import tqdm; GREEN = "\033[92m"; ENDC = "\033[0m" #for tqdm bar
 
 ################################################################################
 
@@ -316,7 +316,10 @@ def clip_to_shape(files,
     args = list(zip(out_files, files))
     with mp.Pool(ncores) as pool:
         args = list(zip(out_files, files))
-        pool.starmap(clip_func, tqdm(args, total=len(args), desc='Clipping raw data', colour='GREEN'))
+        pool.starmap(clip_func, tqdm(args, 
+                                     total=len(args), 
+                                     desc=GREEN+'Clipping raw data'+ENDC, 
+                                     colour='GREEN'))
 
 def _clip_to_shape(extent, 
                    poly, 

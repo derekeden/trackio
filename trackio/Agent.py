@@ -422,6 +422,7 @@ def gen_track_meta(tdf):
         "Max Spatial Resolution": np.nanmax(dxs) if len(dxs) > 0  else 0,
         **tdf.filter(like='Code').any(axis=0).to_dict()
         }
+    tmeta['Sinuosity'] = tmeta['Track Length']/tmeta['Effective Distance']
     return tmeta
 
 def gen_agent_meta(self):

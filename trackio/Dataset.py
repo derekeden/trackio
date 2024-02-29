@@ -26,10 +26,10 @@ from shapely.geometry import (box,
                               MultiLineString, 
                               Polygon, 
                               MultiPolygon)
-from tqdm import tqdm
 import dask.bag as db
 import rasterio as rio
 from inpoly import inpoly2
+from tqdm import tqdm; GREEN = "\033[92m"; ENDC = "\033[0m" #for tqdm bar
 
 ################################################################################
 
@@ -817,6 +817,7 @@ class Dataset:
         #process in parallel
         with mp.Pool(ncores) as pool:
             out = pool.map(utils.collect_agent_pkls, tqdm(files, 
+                                                          desc=GREEN+'Getting agents'+ENDC,
                                                           total=len(files),
                                                           colour='GREEN'))
         return out
@@ -835,6 +836,7 @@ class Dataset:
         #process in parallel
         with mp.Pool(ncores) as pool:
             out = pool.map(utils.read_pkl, tqdm(files, 
+                                                desc=GREEN+'Getting tracks'+ENDC,
                                                 total=len(files), 
                                                 colour='GREEN'))
         #collect tracks
@@ -1107,20 +1109,93 @@ class Dataset:
                              tracks=None, 
                              ncores=1, 
                              out_pth=None,
+                             method='middle',
                              desc='Computing acceleration'):
+        #assert method
+        msg = 'method must be backward, middle, or forward'
+        assert method in ['backward','middle','forward'], msg
         #set out path
         out_pth = self.set_out_pth(out_pth)
         #get the files to process
         pkl_groups = list(zip(*self.get_files_tracks_to_process(agents, tracks)))
         #recompute in parallel
         utils.pool_caller(geometry.compute_acceleration,
-                          (out_pth,),
+                          (out_pth, method),
                           pkl_groups,
                           desc,
                           ncores)  
         #update meta
         meta = self.meta.copy()
         meta['Acceleration'] = f"{meta['Speed']}/second"
+        self.update_meta(out_pth, meta)
+        return self
+
+    def compute_distance_travelled(self, 
+                                   agents=None,
+                                   tracks=None, 
+                                   ncores=1, 
+                                   out_pth=None,
+                                   desc='Computing distance travelled along tracks'):
+        #set out path
+        out_pth = self.set_out_pth(out_pth)
+        #get the files to process
+        pkl_groups = list(zip(*self.get_files_tracks_to_process(agents, tracks)))
+        #recompute in parallel
+        utils.pool_caller(geometry.compute_distance_travelled,
+                          (out_pth,),
+                          pkl_groups,
+                          desc,
+                          ncores)  
+        #update meta
+        meta = self.meta.copy()
+        meta['Distance Travelled'] = meta['X']
+        self.update_meta(out_pth, meta)
+        return self
+
+    def compute_radius_of_curvature(self, 
+                                   agents=None,
+                                   tracks=None, 
+                                   ncores=1, 
+                                   out_pth=None,
+                                   desc='Computing radius of curvature'):
+        #set out path
+        out_pth = self.set_out_pth(out_pth)
+        #get the files to process
+        pkl_groups = list(zip(*self.get_files_tracks_to_process(agents, tracks)))
+        #recompute in parallel
+        utils.pool_caller(geometry.compute_radius_of_curvature,
+                          (out_pth,),
+                          pkl_groups,
+                          desc,
+                          ncores)  
+        #update meta
+        meta = self.meta.copy()
+        meta['Radius of Curvature'] = meta['X']
+        self.update_meta(out_pth, meta)
+        return self
+
+    def compute_sinuosity(self, 
+                          agents=None,
+                          tracks=None, 
+                          ncores=1, 
+                          out_pth=None,
+                          window=3,
+                          desc='Computing sinuosity'):
+        #assert odd window number to be centered on each point
+        assert window%2 > 0, 'window must be an odd number'
+        #set out path
+        out_pth = self.set_out_pth(out_pth)
+        #get the files to process
+        pkl_groups = list(zip(*self.get_files_tracks_to_process(agents, tracks)))
+        #recompute in parallel
+        utils.pool_caller(geometry.compute_sinuosity,
+                          (out_pth, window),
+                          pkl_groups,
+                          desc,
+                          ncores)  
+        #update meta
+        meta = self.meta.copy()
+        meta['Sinuosity'] = 'non-dimensional'
         self.update_meta(out_pth, meta)
         return self
 
