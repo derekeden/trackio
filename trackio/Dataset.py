@@ -27,8 +27,8 @@ from shapely.geometry import (box,
                               Polygon, 
                               MultiPolygon)
 import dask.bag as db
-import rasterio as rio
 from inpoly import inpoly2
+from scipy.interpolate import RegularGridInterpolator
 from tqdm import tqdm; GREEN = "\033[92m"; ENDC = "\033[0m" #for tqdm bar
 
 ################################################################################
@@ -1328,7 +1328,7 @@ class Dataset:
         return self
 
     def interpolate_raster(self,
-                           ras_file,
+                           ras,
                            name,
                            agents=None,
                            tracks=None,
@@ -1336,14 +1336,11 @@ class Dataset:
                            out_pth=None,
                            method='linear',
                            desc='Interpolating raster to tracks'):
-        #read raster
-        ras = rio.open(ras_file)
         #assert same crs
         msg = 'raster file must have same CRS as Dataset'
         assert pyproj.CRS(self.meta['CRS']).equals(ras.crs), msg
         x,_ = ras.xy([0]*ras.shape[0],range(ras.shape[0]))
         _,y = ras.xy(range(ras.shape[1]), [0]*ras.shape[1])
-        from scipy.interpolate import RegularGridInterpolator
         interp = RegularGridInterpolator((x,y), 
                                          ras.read(1),
                                          bounds_error=False,
@@ -1370,8 +1367,8 @@ class Dataset:
                    ncores=1, 
                    tracks0=None, 
                    tracks1=None,
-                   data_cols=['Speed', 'Acceleration', 'Turning Rate', 'Coursing'],
-                   meta_cols=['Name'],
+                   data_cols=[],
+                   meta_cols=[],
                    filter_min=False,
                    desc='Calculating spatiotemporal encounters'):
         #if no input, self encounters
@@ -1381,24 +1378,68 @@ class Dataset:
         #get the two track databases
         db1 = self.tracks
         db2 = dataset.tracks
-        #reduce
-        keepcols = ['Start Time','End Time', 'geometry', 'File']
+        #reduce databases
+        keepcols = ['Start Time',
+                    'End Time', 
+                    'File',
+                    'Agent ID']
         db1 = db1[keepcols]
         db2 = db2[keepcols]
         if tracks0 is not None:
             db1 = db1.loc[tracks0]
         if tracks1 is not None:
-            db2 = db2.loc[tracks1]        
+            db2 = db2.loc[tracks1]   
+        #find overlapping unique pairs
+        _pairs = {'Track ID_0':[],
+                  'Track ID_1':[],
+                  'Agent ID_0':[],
+                  'Agent ID_1':[],
+                  'File_0':[],
+                  'File_1':[]}
+        for i in range(len(db1)):
+            row = db1.iloc[i]
+            tid1 = row.name
+            aid1 = row['Agent ID']
+            f1 = row['File']
+            start = row['Start Time']
+            end = row['End Time'] 
+            time_ids = np.nonzero((end >= db2['Start Time'] - pd.Timedelta(f'{time}s')).values 
+                                   & (db2['End Time'] + pd.Timedelta(f'{time}s') >= start).values)[0]
+            tid2 = db2.index[time_ids]
+            aid2 = db2['Agent ID'].iloc[time_ids]
+            f2 = db2['File'].iloc[time_ids]
+            tid1 = [tid1]*len(tid2)
+            aid1 = [aid1]*len(aid2)
+            f1 = [f1]*len(f2)
+            _pairs['Track ID_0'].extend(tid1)
+            _pairs['Track ID_1'].extend(tid2)
+            _pairs['Agent ID_0'].extend(aid1)
+            _pairs['Agent ID_1'].extend(aid2)
+            _pairs['File_0'].extend(f1)
+            _pairs['File_1'].extend(f2)
+        pairs = pd.DataFrame(_pairs)
+        #make a unique key for all pairs
+        pairs['sorted'] = pairs.apply(lambda x: '_'.join(sorted(x)), axis=1)
+        #delete duplicated keys
+        pairs = pairs.drop_duplicates(subset='sorted')
+        #delete self encounters
+        pairs = pairs[pairs['Track ID_0'] != pairs['Track ID_1']]
+        #simplify track ids for function
+        pairs['ID_0'] = pairs['Track ID_0'].apply(lambda x: x.rsplit('_')[-1])
+        pairs['ID_1'] = pairs['Track ID_1'].apply(lambda x: x.rsplit('_')[-1])
+        #group by agent id to reduce file opens
+        grouped = pairs.groupby(['Agent ID_0', 'Agent ID_1']).agg(list)
+        grouped['File_0'] = grouped['File_0'].apply(lambda x: x[0])
+        grouped['File_1'] = grouped['File_1'].apply(lambda x: x[0])
         #process in parallel
         rows = utils.pool_caller(geometry.encounters,
-                                 (db1, 
-                                  db2, 
+                                 (grouped, 
                                   distance, 
                                   time, 
                                   data_cols,
                                   meta_cols,
                                   filter_min),
-                                 list(range(len(db1))),
+                                 list(range(len(grouped))),
                                  desc,
                                  ncores)
         #convert to geodataframe and return
@@ -1415,8 +1456,8 @@ class Dataset:
                       ncores=1, 
                       tracks0=None, 
                       tracks1=None,                   
-                      data_cols=['Speed', 'Acceleration', 'Turning Rate', 'Coursing'],
-                      meta_cols=['Name'],
+                      data_cols=[],
+                      meta_cols=[],
                       desc='Calculating intersections'):
         #if no input, self intersection
         if dataset is None:
@@ -1425,18 +1466,70 @@ class Dataset:
         #get the two track databases
         db1 = self.tracks
         db2 = dataset.tracks
-        #reduce
-        keepcols = ['Start Time','End Time', 'geometry', 'File']
+        #reduce databases
+        keepcols = ['Start Time',
+                    'End Time', 
+                    'File',
+                    'Agent ID',
+                    'geometry']
         db1 = db1[keepcols]
         db2 = db2[keepcols]
         if tracks0 is not None:
             db1 = db1.loc[tracks0]
         if tracks1 is not None:
-            db2 = db2.loc[tracks1]        
+            db2 = db2.loc[tracks1]   
+        #find overlapping unique pairs
+        _pairs = {'Track ID_0':[],
+                  'Track ID_1':[],
+                  'Agent ID_0':[],
+                  'Agent ID_1':[],
+                  'File_0':[],
+                  'File_1':[]}
+        for i in range(len(db1)):
+            row = db1.iloc[i]
+            tid1 = row.name
+            aid1 = row['Agent ID']
+            f1 = row['File']
+            start = row['Start Time']
+            end = row['End Time'] 
+            bbox = row['geometry']
+            time_ids = np.nonzero((end >= db2['Start Time'] - pd.Timedelta(f'{time}s')).values 
+                                   & (db2['End Time'] + pd.Timedelta(f'{time}s') >= start).values)[0]
+            space_ids = np.nonzero(db2.geometry.intersects(bbox).values)[0]
+            all_ids = [id for id in space_ids if id in time_ids]
+            tid2 = db2.index[all_ids]
+            aid2 = db2['Agent ID'].iloc[all_ids]
+            f2 = db2['File'].iloc[all_ids]
+            tid1 = [tid1]*len(tid2)
+            aid1 = [aid1]*len(aid2)
+            f1 = [f1]*len(f2)
+            _pairs['Track ID_0'].extend(tid1)
+            _pairs['Track ID_1'].extend(tid2)
+            _pairs['Agent ID_0'].extend(aid1)
+            _pairs['Agent ID_1'].extend(aid2)
+            _pairs['File_0'].extend(f1)
+            _pairs['File_1'].extend(f2)
+        pairs = pd.DataFrame(_pairs)
+        #make a unique key for all pairs
+        pairs['sorted'] = pairs.apply(lambda x: '_'.join(sorted(x)), axis=1)
+        #delete duplicated keys
+        pairs = pairs.drop_duplicates(subset='sorted')
+        #delete self encounters
+        pairs = pairs[pairs['Track ID_0'] != pairs['Track ID_1']]
+        #simplify track ids for function
+        pairs['ID_0'] = pairs['Track ID_0'].apply(lambda x: x.rsplit('_')[-1])
+        pairs['ID_1'] = pairs['Track ID_1'].apply(lambda x: x.rsplit('_')[-1])
+        #group by agent id to reduce file opens
+        grouped = pairs.groupby(['Agent ID_0', 'Agent ID_1']).agg(list)
+        grouped['File_0'] = grouped['File_0'].apply(lambda x: x[0])
+        grouped['File_1'] = grouped['File_1'].apply(lambda x: x[0])
         #process in parallel
         rows = utils.pool_caller(geometry.intersections,
-                                 (db1, db2, time, data_cols, meta_cols),
-                                 list(range(len(db1))),
+                                 (grouped, 
+                                  time, 
+                                  data_cols,
+                                  meta_cols),
+                                 list(range(len(grouped))),
                                  desc,
                                  ncores)
         #convert to geodataframe and return
@@ -1451,8 +1544,8 @@ class Dataset:
                             shapely_object, 
                             agents=None,
                             tracks=None, 
-                            data_cols=['Speed', 'Acceleration', 'Turning Rate', 'Coursing'],
-                            meta_cols=['Name'],
+                            data_cols=[],
+                            meta_cols=[],
                             ncores=1, 
                             desc='Calculating proximities to object'):
         #get the files to process
@@ -1474,38 +1567,85 @@ class Dataset:
                     dataset=None,
                     tracks0=None, 
                     tracks1=None,
-                    data_cols=['Speed', 'Acceleration', 'Turning Rate', 'Coursing'],
-                    meta_cols=['Name'],
+                    data_cols=[],
+                    meta_cols=[],
                     ncores=1, 
                     bins=None, 
                     relative=False,
-                    desc='Calculating agent proximities'):
+                    desc='Calculating track proximities'):
         print('Proximity analysis assumes that self.resample_time_global has already been run, '\
             'if not the results will be invalid or the function may fail')
         #if no input, self encounters
         if dataset is None:
             dataset = self.copy()
         assert self.meta['CRS'] == dataset.meta['CRS'], 'CRS does not match between Datasets'
+        #ensure relative is False if no bins
+        if bins is None:
+            relative = False
         #get the two track databases
         db1 = self.tracks
         db2 = dataset.tracks
-        #reduce
-        keepcols = ['Start Time','End Time', 'geometry', 'File']
+        #reduce databases
+        keepcols = ['Start Time',
+                    'End Time', 
+                    'File',
+                    'Agent ID']
         db1 = db1[keepcols]
         db2 = db2[keepcols]
         if tracks0 is not None:
             db1 = db1.loc[tracks0]
         if tracks1 is not None:
-            db2 = db2.loc[tracks1]        
-        #process proximities in parallel
+            db2 = db2.loc[tracks1]   
+        #find overlapping unique pairs
+        _pairs = {'Track ID_0':[],
+                  'Track ID_1':[],
+                  'Agent ID_0':[],
+                  'Agent ID_1':[],
+                  'File_0':[],
+                  'File_1':[]}
+        for i in range(len(db1)):
+            row = db1.iloc[i]
+            tid1 = row.name
+            aid1 = row['Agent ID']
+            f1 = row['File']
+            start = row['Start Time']
+            end = row['End Time'] 
+            time_ids = np.nonzero((end >= db2['Start Time']).values 
+                                   & (db2['End Time'] >= start).values)[0]
+            tid2 = db2.index[time_ids]
+            aid2 = db2['Agent ID'].iloc[time_ids]
+            f2 = db2['File'].iloc[time_ids]
+            tid1 = [tid1]*len(tid2)
+            aid1 = [aid1]*len(aid2)
+            f1 = [f1]*len(f2)
+            _pairs['Track ID_0'].extend(tid1)
+            _pairs['Track ID_1'].extend(tid2)
+            _pairs['Agent ID_0'].extend(aid1)
+            _pairs['Agent ID_1'].extend(aid2)
+            _pairs['File_0'].extend(f1)
+            _pairs['File_1'].extend(f2)
+        pairs = pd.DataFrame(_pairs)
+        #make a unique key for all pairs
+        pairs['sorted'] = pairs.apply(lambda x: '_'.join(sorted(x)), axis=1)
+        #delete duplicated keys
+        pairs = pairs.drop_duplicates(subset='sorted')
+        #delete self encounters
+        pairs = pairs[pairs['Track ID_0'] != pairs['Track ID_1']]
+        #simplify track ids for function
+        pairs['ID_0'] = pairs['Track ID_0'].apply(lambda x: x.rsplit('_')[-1])
+        pairs['ID_1'] = pairs['Track ID_1'].apply(lambda x: x.rsplit('_')[-1])
+        #group by agent id to reduce file opens
+        grouped = pairs.groupby(['Agent ID_0', 'Agent ID_1']).agg(list)
+        grouped['File_0'] = grouped['File_0'].apply(lambda x: x[0])
+        grouped['File_1'] = grouped['File_1'].apply(lambda x: x[0])
+        #process in parallel
         rows = utils.pool_caller(geometry.proximities,
-                                 (db1, 
-                                  db2, 
-                                  bins, 
-                                  relative, 
-                                  data_cols, 
+                                 (grouped,
+                                  bins,
+                                  relative,
+                                  data_cols,
                                   meta_cols),
-                                 list(range(len(db1))),
+                                 list(range(len(grouped))),
                                  desc,
                                  ncores)
         #convert to dataframe
@@ -1685,14 +1825,43 @@ class Dataset:
         #update meta
         self.update_meta(out_pth, self.meta)
         return self
-             
-    # def flow_map(self):
-    #     #implement that paper 
-    #     pass
     
-    # def reduce_to_flow_map(self):
-    #     #implement that paper 
-    #     pass
+    def route_through_raster(self, 
+                             raster,
+                             agents=None,
+                             tracks=None,
+                             out_pth=None,
+                             end=None,
+                             desc='Routing tracks through raster',
+                             ncores=1,
+                             **kwargs):
+        #set out path
+        out_pth = self.set_out_pth(out_pth)
+        #get the raster info
+        b = raster.bounds
+        polygon, edges = utils.format_polygon(box(b.left, b.bottom, b.right, b.top))
+        array = raster.read(1)
+        transform = raster.transform
+        width = raster.width
+        height = raster.height
+        row_inds, col_inds = np.indices((height, width))
+        x_coords, y_coords = transform * (col_inds, row_inds)
+        coords = np.dstack([x_coords, y_coords])
+        #get the files to process
+        pkl_groups = list(zip(*self.get_files_tracks_to_process(agents, tracks)))
+        #compute in parallel
+        utils.pool_caller(geometry.route_through_raster,
+                          (array, 
+                           polygon, 
+                           edges, 
+                           coords,
+                           end,
+                           out_pth,
+                           kwargs),
+                          pkl_groups,
+                          desc,
+                          ncores)
+        return self
 
     ############################################################################
     #CLUSTERING

@@ -29,6 +29,7 @@ setup(
         "pyproj",
         "beautifulsoup4",
         "scikit-learn",
+        "scikit-image",
         "kneed",
         "dask"
     ],    

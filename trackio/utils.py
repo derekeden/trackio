@@ -224,5 +224,12 @@ def first_nonzero(lst):
             out = l
             break
     return out
+                
+def NN_idx2(query, coords):
+    dx = coords[:,:,0] - query[0]    
+    dy = coords[:,:,1] - query[1]
+    dr = dx**2 + dy**2        
+    idx2 = np.unravel_index(np.argmin(dr), dr.shape)
+    return idx2
 
 ################################################################################

@@ -1,6 +1,6 @@
 ################################################################################
 
-from .utils import read_pkl, save_pkl, collect_agent_pkls
+from .utils import read_pkl, save_pkl, collect_agent_pkls, NN_idx2
 
 import numpy as np
 from pyproj import CRS, Geod
@@ -9,6 +9,7 @@ import pandas as pd
 from shapely.geometry import Point, LineString
 from inpoly import inpoly2
 from more_itertools import consecutive_groups
+from skimage.graph import route_through_array
 
 #for dividing by zero in lin alg equations - returns nan anyways, but annoying
 import warnings
@@ -1024,131 +1025,122 @@ def perpendicular_distance(A, B, P):
     distance = numerator / denominator
     return distance
 
-def proximities(db1, 
-                db2, 
+def proximities(grouped,
                 bins, 
                 relative,
                 data_cols,
                 meta_cols,
                 i):
+    #update data cols
+    if 'Time' not in data_cols: data_cols += ['Time']
+    if 'X' not in data_cols: data_cols += ['X']
+    if 'Y' not in data_cols: data_cols += ['Y']
     #if bins
     if bins is not None:
         bins = sorted(set(bins))
-    #empty output
+    #get row
+    group = grouped.iloc[i]
+    #get files
+    file1 = group['File_0']
+    file2 = group['File_1']
+    #get track combos
+    tids1 = group['ID_0']
+    tids2 = group['ID_1']
+    #read agents
+    a1 = read_pkl(file1)
+    a2 = read_pkl(file2)
+    #loop over combos
     rows = []
-    #first spatial and temporal intersection pass
-    tid = db1.index[i]
-    vid = tid.rsplit('_', 1)[0]
-    box = db1.iloc[i]['geometry']
-    start = db1.iloc[i]['Start Time']
-    end = db1.iloc[i]['End Time']            
-    # space_ids = np.argwhere(db2.geometry.intersects(box).values).flatten()
-    time_ids = np.argwhere((end >= db2['Start Time']).values & (db2['End Time'] >= start).values).flatten()
-    #indices in db2 that intersect with track i
-    # ids2 = np.array([id for id in space_ids if id in time_ids])
-    ids2 = np.array(time_ids)
-    #if no matches
-    if len(ids2) == 0:
-        pass
-    #if matches
-    else:
-        #the original track
-        v1 = read_pkl(db1.loc[tid,'File'])
-        t1 = v1.tracks[tid.rsplit('_', 1)[1]]
-        #track ids from db2 to check
-        track_ids2 = db2.index[ids2].tolist()
-        for track_id2 in track_ids2:
-            #get Agent ID before opening
-            vid2 = track_id2.rsplit('_',1)[0]
-            #skip all self encounters with itself
-            if vid == vid2:
+    for k, (tid1, tid2) in enumerate(zip(tids1, tids2)):
+        #get the tracks
+        t1 = a1.tracks[tid1]
+        t2 = a2.tracks[tid2]
+        #skip 1 pingers
+        if len(t1) < 2 or len(t2) < 2:
+            continue
+        #filter to common timesteps
+        common = t1['Time'].isin(t2['Time'].values)
+        common_times = t1['Time'].loc[common]
+        common_t1 = t1.loc[common].copy()
+        common_t2 = t2[t2['Time'].isin(common_times.values)].copy()
+        #calculate distances
+        dist = ((common_t1['X'].values - common_t2['X'].values)**2 +
+                (common_t1['Y'].values - common_t2['Y'].values)**2)**0.5
+        #if bins
+        if bins is not None:
+            #if only 1 ping, cant calculate durations
+            if len(dist) < 2:
                 continue
-            #get track
-            v2 = read_pkl(db2.loc[track_id2, 'File'])
-            t2 = v2.tracks[track_id2.rsplit('_', 1)[1]]
-            #filter to common timesteps
-            common = t1['Time'].isin(t2['Time'].values)
-            common_times = t1['Time'].loc[common]
-            common_t1 = t1.loc[common].copy()
-            common_t2 = t2[t2['Time'].isin(common_times.values)].copy()
-            #calculate distances
-            dist = ((common_t1['X'].values - common_t2['X'].values)**2 +
-                    (common_t1['Y'].values - common_t2['Y'].values)**2)**0.5
-            #if bins
-            if bins is not None:
-                #if only 1 ping, cant calculate durations
-                if len(dist) < 2:
-                    continue
-                #if more than 1
-                elapsed = (common_times - common_times.iloc[0]).dt.total_seconds().values
-                if relative:
-                    time_spent = {'Time':common_times.tolist(),
-                                  **{b:[0]*len(common_times) for b in bins}}
-                else:
-                    time_spent = dict(zip(bins, [0]*len(bins)))
-                durations = np.diff(elapsed)
-                #loop over bins
-                for bin in bins:
-                    #loop over distances/durations
-                    for j in range(len(dist)-1):
-                        #get segment
-                        d1 = dist[j]
-                        d2 = dist[j+1]
-                        #check if touching or below
-                        if d1 <= bin and d2 <= bin:
-                            if relative:
-                                time_spent[bin][j] += durations[j]
-                            else:
-                                time_spent[bin] += durations[j]
-                        #check if crossing
-                        elif (d1<bin and d2>bin) or (d1>bin and d2<bin):
-                            if relative:
-                                frac = (bin-d1)/(d2-d1)
-                                time_spent[bin][j] += durations[j]*frac
-                            else:
-                                frac = (bin-d1)/(d2-d1)
-                                time_spent[bin] += durations[j]*frac
-                        #check if above
-                        else:
-                            pass
-            #if relative append the rows
+            #if more than 1
+            elapsed = (common_times - common_times.iloc[0]).dt.total_seconds().values
             if relative:
-                rows.append(time_spent)
-            #if not create non relative rows
+                time_spent = {'Time':common_times.tolist(),
+                                **{b:[0]*len(common_times) for b in bins}}
             else:
-                #get the minimum distance
-                idx = np.argmin(dist)
-                min_dist = dist[idx]
-                #concat the dataframes
-                if 'Time' not in data_cols: data_cols += ['Time']
-                if 'X' not in data_cols: data_cols += ['X']
-                if 'Y' not in data_cols: data_cols += ['Y']
-                common_t1 = common_t1[data_cols]
-                common_t2 = common_t2[data_cols]
-                common_t1.columns = [c+'_0' for c in common_t1.columns]
-                common_t2.columns = [c+'_1' for c in common_t2.columns]
-                row = pd.concat([common_t1.iloc[idx], 
-                                common_t2.iloc[idx]]).to_dict()
-                #add meta data cols
-                for col in meta_cols:
-                    row[f'{col}_0'] = v1.agent_meta[col]
-                    row[f'{col}_1'] = v2.agent_meta[col] 
-                row['Minimum Distance'] = min_dist
-                row['Agent ID_0'] = v1.agent_meta['Agent ID']
-                row['Agent ID_1'] = v2.agent_meta['Agent ID']
-                row['Track ID_0'] = tid
-                row['Track ID_1'] = track_id2
-                row['Common Timesteps'] = len(common_times)
-                if bins is not None:
-                    row.update(time_spent)            
-                rows.append(row)
+                time_spent = dict(zip(bins, [0]*len(bins)))
+            durations = np.diff(elapsed)
+            #loop over bins
+            for bin in bins:
+                #loop over distances/durations
+                for j in range(len(dist)-1):
+                    #get segment
+                    d1 = dist[j]
+                    d2 = dist[j+1]
+                    #check if touching or below
+                    if d1 <= bin and d2 <= bin:
+                        if relative:
+                            time_spent[bin][j] += durations[j]
+                        else:
+                            time_spent[bin] += durations[j]
+                    #check if crossing
+                    elif (d1<bin and d2>bin) or (d1>bin and d2<bin):
+                        if relative:
+                            frac = (bin-d1)/(d2-d1)
+                            time_spent[bin][j] += durations[j]*frac
+                        else:
+                            frac = (bin-d1)/(d2-d1)
+                            time_spent[bin] += durations[j]*frac
+                    #check if above
+                    else:
+                        pass
+        #if relative append the rows
+        if relative:
+            rows.append(time_spent)
+        #if not create non relative rows
+        else:
+            #get the minimum distance
+            idx = np.argmin(dist)
+            min_dist = dist[idx]
+            #concat the dataframes
+            common_t1 = common_t1[data_cols]
+            common_t2 = common_t2[data_cols]
+            common_t1.columns = [c+'_0' for c in common_t1.columns]
+            common_t2.columns = [c+'_1' for c in common_t2.columns]
+            row = pd.concat([common_t1.iloc[idx], 
+                            common_t2.iloc[idx]]).to_dict()
+            #add meta data cols
+            for col in meta_cols:
+                row[f'{col}_0'] = a1.agent_meta[col]
+                row[f'{col}_1'] = a2.agent_meta[col] 
+            row['Minimum Distance'] = min_dist
+            row['Agent ID_0'] = a1.agent_meta['Agent ID']
+            row['Agent ID_1'] = a2.agent_meta['Agent ID']
+            row['Track ID_0'] = group['Track ID_0'][k]
+            row['Track ID_1'] = group['Track ID_1'][k]
+            row['Common Timesteps'] = len(common_times)
+            #if bins add time spent in bins
+            if bins is not None:
+                row.update(time_spent)            
+            #append row
+            rows.append(row)
     if relative:
-        #it's possible t1 has 1 ping, in which case no rows would have been appended
-        #this screws up the grouping in the next step, easier to just make a blank one
+        #its possible no proximities fell inside the bins
         if len(rows) == 0:
             return pd.DataFrame(columns=['Time']+bins)
+        #if there are rows to concat
         else:
             rows = pd.concat([pd.DataFrame(r) for r in rows]).reset_index(drop=True)
+            #this gets the max amount of time spent in each temporal chunk
             rows = rows.groupby('Time').agg(max).reset_index()
     return rows
  
@@ -1196,168 +1188,139 @@ def _get_closest_encounters(t1, t2, time, distance, filter_min):
         encounters = [encounters[min_idx]]
     return encounters
    
-def encounters(db1, 
-               db2, 
+def encounters(grouped, 
                distance, 
                time, 
                data_cols, 
                meta_cols,
                filter_min,
                i):
+    #get row
+    group = grouped.iloc[i]
+    #get files
+    file1 = group['File_0']
+    file2 = group['File_1']
+    #get track combos
+    tids1 = group['ID_0']
+    tids2 = group['ID_1']
+    #read agents
+    a1 = read_pkl(file1)
+    a2 = read_pkl(file2)
+    #loop over combos
     rows = []
-    #first spatial and temporal intersection pass
-    tid = db1.index[i]
-    box = db1.iloc[i]['geometry']
-    start = db1.iloc[i]['Start Time']
-    end = db1.iloc[i]['End Time']            
-    # space_ids = np.argwhere(db2.geometry.intersects(box).values).flatten()
-    time_ids = np.argwhere((end >= db2['Start Time']).values & (db2['End Time'] >= start).values).flatten()
-    #indices in db2 that intersect with track i
-    # ids2 = np.array([id for id in space_ids if id in time_ids])
-    ids2 = np.array(time_ids)
-    if len(ids2) == 0:
-        pass
-    else:
-        #the original track
-        a1 = read_pkl(db1.loc[tid,'File'])
-        t1 = a1.tracks[tid.rsplit('_', 1)[1]]
-        #track ids from db2 to check
-        track_ids2 = db2.index[ids2].tolist()
-        #loop over tracks
-        for track_id2 in track_ids2:
-            #skip self encounters
-            if tid == track_id2:
-                continue
-            #get track
-            a2 = read_pkl(db2.loc[track_id2, 'File'])
-            t2 = a2.tracks[track_id2.rsplit('_', 1)[1]]
-            #get encounter dist/time
-            encounters = _get_closest_encounters(t1, t2, time, distance, filter_min)
-            for encounter in encounters:
-                deltar, deltat, idx1, idx2 = encounter
-                #build the dataframe row
-                p1 = Point(t1['X'].iloc[idx1], t1['Y'].iloc[idx1])
-                p2 = Point(t2['X'].iloc[idx2], t2['Y'].iloc[idx2])
-                center_x = (p1.x + p2.x) / 2
-                center_y = (p1.y + p2.y) / 2
-                center = Point(center_x, center_y)
-                radius = p1.distance(p2) / 2
-                circle = center.buffer(radius)
-                row = {'Agent ID_0': a1.agent_meta['Agent ID'],
-                    'Track ID_0': tid,
-                    'Agent ID_1': a2.agent_meta['Agent ID'],
-                    'Track ID_1': track_id2,
-                    'X_0': t1['X'].iloc[idx1],
-                    'Y_0': t1['Y'].iloc[idx1],
-                    'X_1': t2['X'].iloc[idx2],
-                    'Y_1': t2['Y'].iloc[idx2],                    
-                    'Time_0': t1['Time'].iloc[idx1],
-                    'Time_1': t2['Time'].iloc[idx2],
-                    'Minimum Distance': deltar,
-                    'Time Difference': deltat,
-                    'geometry':circle}
-                #add meta data cols
-                for col in meta_cols:
-                    row[f'{col}_0'] = a1.agent_meta[col]
-                    row[f'{col}_1'] = a2.agent_meta[col] 
-                #add dynamic data cols
-                for col in data_cols:
-                    row[f'{col}_0'] = t1[col].iloc[idx1]
-                    row[f'{col}_1'] = t2[col].iloc[idx2]    
-                rows.append(row) 
+    for j, (tid1, tid2) in enumerate(zip(tids1, tids2)):
+        t1 = a1.tracks[tid1]
+        t2 = a2.tracks[tid2]
+        #get encounter dist/time
+        encounters = _get_closest_encounters(t1, t2, time, distance, filter_min)
+        for encounter in encounters:
+            deltar, deltat, idx1, idx2 = encounter
+            #build the dataframe row
+            p1 = Point(t1['X'].iloc[idx1], t1['Y'].iloc[idx1])
+            p2 = Point(t2['X'].iloc[idx2], t2['Y'].iloc[idx2])
+            center_x = (p1.x + p2.x) / 2
+            center_y = (p1.y + p2.y) / 2
+            center = Point(center_x, center_y)
+            radius = p1.distance(p2) / 2
+            circle = center.buffer(radius)
+            row = {'Agent ID_0': a1.agent_meta['Agent ID'],
+                'Track ID_0': group['Track ID_0'][j],
+                'Agent ID_1': a2.agent_meta['Agent ID'],
+                'Track ID_1': group['Track ID_1'][j],
+                'X_0': t1['X'].iloc[idx1],
+                'Y_0': t1['Y'].iloc[idx1],
+                'X_1': t2['X'].iloc[idx2],
+                'Y_1': t2['Y'].iloc[idx2],                    
+                'Time_0': t1['Time'].iloc[idx1],
+                'Time_1': t2['Time'].iloc[idx2],
+                'Minimum Distance': deltar,
+                'Time Difference': deltat,
+                'geometry':circle}
+            #add meta data cols
+            for col in meta_cols:
+                row[f'{col}_0'] = a1.agent_meta[col]
+                row[f'{col}_1'] = a2.agent_meta[col] 
+            #add dynamic data cols
+            for col in data_cols:
+                row[f'{col}_0'] = t1[col].iloc[idx1]
+                row[f'{col}_1'] = t2[col].iloc[idx2]    
+            rows.append(row) 
     return rows
 
-def intersections(db1, 
-                  db2, 
-                  time_threshold, 
-                  data_cols,
+def intersections(grouped, 
+                  time, 
+                  data_cols, 
                   meta_cols,
                   i):
+    #get row
+    group = grouped.iloc[i]
+    #get files
+    file1 = group['File_0']
+    file2 = group['File_1']
+    #get track combos
+    tids1 = group['ID_0']
+    tids2 = group['ID_1']
+    #read agents
+    a1 = read_pkl(file1)
+    a2 = read_pkl(file2)
+    #edit data cols
+    if 'Time' not in data_cols: data_cols += ['Time']
+    #loop over combos
     rows = []
-    #do the first filter
-    tid = db1.index[i]
-    box = db1.iloc[i]['geometry']
-    start = db1.iloc[i]['Start Time']
-    end = db1.iloc[i]['End Time']            
-    space_ids = np.argwhere(db2.geometry.intersects(box).values).flatten()
-    time_ids = np.argwhere((end >= db2['Start Time']).values & (db2['End Time'] >= start).values).flatten()
-    ids = [id for id in space_ids if id in time_ids]
-    #indices for db2 to check for this track
-    ids2 = np.array(ids)
-    #if none
-    if len(ids2) == 0:
-        pass
-    else:        
-        #the original track
-        a1 = read_pkl(db1.loc[tid,'File'])
-        t1 = a1.tracks[tid.rsplit('_', 1)[1]]
-        cumdist1 = ((t1['X'].diff()**2 + t1['Y'].diff()**2)**0.5).values
-        cumdist1[0] = 0
+    for j, (tid1, tid2) in enumerate(zip(tids1, tids2)):
+        t1 = a1.tracks[tid1]
+        t2 = a2.tracks[tid2]
         #skip 1 pingers
-        if len(t1) < 2:
-            return rows
-        #if more than 1 ping
+        if len(t1) < 2 or len(t2) < 2:
+            continue
+        #make shapely
         track1 = LineString(zip(t1['X'].values, 
                                 t1['Y'].values))
-        #first check if the bbox intersects with the track
-        touches = db2.iloc[ids2]['geometry'].intersects(track1).values
-        ids2 = ids2[touches]
-        #track ids from db2 to check
-        track_ids2 = db2.index[ids2].tolist()
-        #loop over tracks
-        for track_id2 in track_ids2:
-            #skip self intersections
-            if tid == track_id2:
-                continue
-            #get track
-            a2 = read_pkl(db2.loc[track_id2, 'File'])
-            t2 = a2.tracks[track_id2.rsplit('_', 1)[1]]
-            cumdist2 = ((t2['X'].diff()**2 + t2['Y'].diff()**2)**0.5).values
-            cumdist2[0] = 0
-            #skip 1 pingers
-            if len(t2) < 2:
-                continue
-            track2 = LineString(zip(t2['X'].values, 
-                                    t2['Y'].values))
-            #check if it intersects
-            if track1.intersects(track2):
-                #get the intersections
-                cd1, cd2, x, y = find_intersection_points(t1[['X','Y']].values,
-                                                          t2[['X','Y']].values).T
-                #interpolate dynamic attributes to intersections
-                if 'Time' not in data_cols: data_cols += ['Time']
-                new_track1 = interpolate_dynamic_data(t1[data_cols], cd1, cumdist1)
-                new_track2 = interpolate_dynamic_data(t2[data_cols], cd2, cumdist2)
-                new_track1['X'] = x
-                new_track1['Y'] = y
-                new_track2['X'] = x
-                new_track2['Y'] = y
-                #reduce to those passing time threshold
-                dt = np.abs(new_track1['Time'] - new_track2['Time']).dt.total_seconds()
-                mask = dt <= time_threshold
-                #if any valid intersections
-                if sum(mask) > 0:
-                    new_track1 = new_track1.loc[mask]
-                    new_track2 = new_track2.loc[mask]
-                    #combine into 1 data
-                    new_track1['Agent ID'] = a1.agent_meta['Agent ID']
-                    new_track2['Agent ID'] = a2.agent_meta['Agent ID']
-                    new_track1['Track ID'] = tid
-                    new_track2['Track ID'] = track_id2
-                    new_track1.columns = [f'{col}_0' for col in new_track1.columns]
-                    new_track2.columns = [f'{col}_1' for col in new_track2.columns]
-                    _rows = pd.concat([new_track1, new_track2], axis=1)
-                    #add meta data cols
-                    for col in meta_cols:
-                        _rows[f'{col}_0'] = a1.agent_meta[col]
-                        _rows[f'{col}_1'] = a2.agent_meta[col] 
-                    #add time difference
-                    _rows['Time Difference'] = np.abs(_rows['Time_0'] - _rows['Time_1']).dt.total_seconds().values
-                    #add geometry column
-                    _rows['geometry'] = _rows[['X_0','Y_0']].apply(lambda xy: Point(*xy), axis=1)
-                    rows.extend(_rows.to_dict('records'))
-                else:
-                    pass
+        track2 = LineString(zip(t2['X'].values, 
+                                t2['Y'].values))
+        #make cumulative dists along each track for interpolation
+        cumdist1 = ((t1['X'].diff()**2 + t1['Y'].diff()**2)**0.5).values
+        cumdist1[0] = 0
+        cumdist2 = ((t2['X'].diff()**2 + t2['Y'].diff()**2)**0.5).values
+        cumdist2[0] = 0
+        #check if it intersects
+        if track1.intersects(track2):
+            #get the intersections
+            cd1, cd2, x, y = find_intersection_points(t1[['X','Y']].values,
+                                                      t2[['X','Y']].values).T
+            #interpolate data to intersections
+            new_track1 = interpolate_dynamic_data(t1[data_cols], cd1, cumdist1)
+            new_track2 = interpolate_dynamic_data(t2[data_cols], cd2, cumdist2)
+            new_track1['X'] = x
+            new_track1['Y'] = y
+            new_track2['X'] = x
+            new_track2['Y'] = y
+            #reduce to those passing time threshold
+            dt = np.abs(new_track1['Time'] - new_track2['Time']).dt.total_seconds()
+            mask = dt <= time
+            #if any valid intersections
+            if sum(mask) > 0:
+                new_track1 = new_track1.loc[mask]
+                new_track2 = new_track2.loc[mask]
+                #combine into 1 dataframe
+                new_track1['Agent ID'] = a1.agent_meta['Agent ID']
+                new_track2['Agent ID'] = a2.agent_meta['Agent ID']
+                new_track1['Track ID'] = group['Track ID_0'][j]
+                new_track2['Track ID'] = group['Track ID_1'][j]
+                new_track1.columns = [f'{col}_0' for col in new_track1.columns]
+                new_track2.columns = [f'{col}_1' for col in new_track2.columns]
+                _rows = pd.concat([new_track1, new_track2], axis=1)
+                #add meta data cols
+                for col in meta_cols:
+                    _rows[f'{col}_0'] = a1.agent_meta[col]
+                    _rows[f'{col}_1'] = a2.agent_meta[col] 
+                #add time difference
+                _rows['Time Difference'] = np.abs(_rows['Time_0'] - _rows['Time_1']).dt.total_seconds().values
+                #add geometry column
+                _rows['geometry'] = _rows[['X_0','Y_0']].apply(lambda xy: Point(*xy), axis=1)
+                rows.extend(_rows.to_dict('records'))
+            else:
+                pass
     return rows
 
 def find_intersection_points(polyline1, polyline2):
@@ -1466,8 +1429,11 @@ def imprint_geometry(polylines,
                     for j in range(len(xy)-1):
                         track_segment = xy[j], xy[j+1]
                         #check if intersecting
-                        intersection = line_intersection(shape_segment, track_segment)
-                        if intersection is not None:
+                        # intersection = line_intersection(shape_segment, track_segment)
+                        intersection = find_intersection_points(shape_segment, track_segment)
+                        # if intersection is not None:
+                        if len(intersection) > 0:
+                            intersection = intersection[0]
                             #add the new points into the track
                             dxi = (intersection[0] - track_segment[0][0])**2
                             dyi = (intersection[1] - track_segment[0][1])**2
@@ -1566,8 +1532,9 @@ def lateral_distribution(long,
                 _i = find_intersection_points(polyline1, polyline2)                
                 #round for geographic & floating pt errors
                 i = np.array(_i).round(8) 
-                #reset the longitudinal distance
-                i[:,0] = lon
+                #add the longitudinal slice distance
+                add_lon = np.array([lon]*len(i)).reshape(-1,1)
+                i = np.hstack([i, add_lon])
                 #fix lateral distances
                 #get distance from centreline
                 idx = i[:,2] - center[0]
@@ -1588,7 +1555,7 @@ def lateral_distribution(long,
         intersections = np.array(intersections)
         centers = np.array(centers)
         #split by direction
-        angle = np.degrees(np.arctan2(perpx, perpy)) #TN angle of cross-section from L to R looking down arc
+        angle = (np.degrees(np.arctan2(perpx, perpy)) + 180)%360 #TN angle of cross-section from L to R looking down arc
         xd = np.diff(track['X'])
         yd = np.diff(track['Y'])
         dist = np.sqrt(xd ** 2 + yd ** 2)
@@ -1601,7 +1568,7 @@ def lateral_distribution(long,
                                              oldx)
         angle_diffs = (new_track['Coursing'].values - angle)%360
         direction = np.where(angle_diffs <= 180,  'T', 'F')
-        row = pd.DataFrame({'Longitudinal Distance': intersections[:,0],
+        row = pd.DataFrame({'Longitudinal Distance': intersections[:,4],
                             'Lateral Distance': intersections[:,1],
                             'TrackX': intersections[:,2],
                             'TrackY': intersections[:,3],
@@ -1615,7 +1582,7 @@ def lateral_distribution(long,
         for col in meta_cols:
             row.loc[:,col] = agent.meta[col]
         row.loc[:, 'Agent ID'] = agent.meta['Agent ID']
-        row.loc[:, 'Track ID'] = agent.agent_meta['Track'][tid]['Track ID']
+        row.loc[:, 'Track ID'] = agent.agent_meta['Tracks'][tid]['Track ID']
         #append row
         rows.append(row)
     #combine and return
@@ -1652,7 +1619,7 @@ def time_in_polygon(polygon,
         y = track['Y'].values
         result = np.logical_or(*inpoly2(np.column_stack((x, y)), 
                                         polygon, 
-                                        edges))  
+                                        edges, ftol=1e-8))  
         #get segments inside polygon
         result = np.nonzero(result)[0]
         segments = [list(g) for g in consecutive_groups(result)]
@@ -1670,8 +1637,8 @@ def time_in_polygon(polygon,
             subtrack = track.iloc[segment][data_cols].copy()
             #calculate few columns
             elapsed = (subtrack['Time'].iloc[-1] - subtrack['Time'].iloc[0]).total_seconds()
-            xd = np.diff(track['X'])
-            yd = np.diff(track['Y'])
+            xd = np.diff(subtrack['X'])
+            yd = np.diff(subtrack['Y'])
             dist = np.sqrt(xd ** 2 + yd ** 2)
             distance = sum(dist)
             #make row
@@ -1758,5 +1725,105 @@ def reduce_to_flow_map(characteristic_col,
     #save the agent back
     out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
-            
+
+def route_through_raster(array,
+                        polygon,
+                        edges,
+                        coords,
+                        end,
+                        out_pth,
+                        kwargs,
+                        args):
+    #split args
+    pkl_files, tracks = args
+    #read split agent file
+    agent = collect_agent_pkls(pkl_files)
+    #reduce to tracks of interest
+    if len(tracks) > 0:
+        tids = [tid for tid in agent.tracks.keys() 
+                if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks]
+    else:
+        tids = agent.tracks.keys()
+    #loop over each track, route through polygons
+    for tid in tids:
+        track = agent.tracks[tid]
+        #skip single point tracks
+        if len(track) == 1:
+            continue
+        #classify points inside polygon
+        x = track['X'].values
+        y = track['Y'].values
+        result = np.logical_or(*inpoly2(np.column_stack((x, y)), 
+                                        polygon, 
+                                        edges,
+                                        ftol=1e-8))
+        #check if doesn't touch
+        if sum(result) == 0:
+            continue
+        #if it does get the groups of ins/outs
+        split_ids = np.nonzero(np.diff(result))[0] + 1
+        groups = np.split(result, split_ids)
+        idxs = np.split(range(len(result)), split_ids)
+        #loop over pairs of groups
+        new_tracks = []
+        for i in range(len(groups)-1):
+            g1 = groups[i]
+            g2 = groups[i+1]
+            #if starts inside
+            if g1[0]: 
+                if i == 0:
+                    #first point
+                    p0 = x[idxs[i][0]], y[idxs[i][0]]  
+                else:
+                    #last point
+                    p0 = x[idxs[i][-1]], y[idxs[i][-1]]  
+                before_idx = []
+            #if starts outside
+            else:
+                #crossing point into raster
+                _p01 = x[idxs[i][-1]], y[idxs[i][-1]]
+                _p02 = x[idxs[i+1][0]], y[idxs[i+1][0]]
+                p0 = find_intersection_points(np.array([_p01, _p02]), polygon)[:, 2:][0]
+                before_idx = idxs[i]
+            #if ends inside
+            if g2[0]:
+                #if override
+                if end is not None:
+                    p1 = end
+                #last point
+                else:
+                    p1 = x[idxs[i+1][-1]], y[idxs[i+1][-1]]
+                after_idx = []
+            #if ends outside
+            else:
+                #crossing point out of raster
+                _p11 = x[idxs[i][-1]], y[idxs[i][-1]]
+                _p12 = x[idxs[i+1][0]], y[idxs[i+1][0]]
+                p1 = find_intersection_points(np.array([_p11, _p12]), polygon)[:, 2:][0]
+                after_idx = idxs[i+1]
+            #get i,j coords of each point
+            startij = NN_idx2(p0, coords)
+            endij = NN_idx2(p1, coords)
+            #get routed indices
+            routed_ij = route_through_array(array, startij, endij, **kwargs)[0]
+            rows, cols = zip(*routed_ij)
+            new_x = coords[rows, cols, 0]
+            new_y = coords[rows, cols, 1]
+            #get new coordinates
+            before = track.iloc[before_idx]
+            routed = pd.DataFrame({'X': new_x, 'Y':new_y})
+            after = track.iloc[after_idx]
+            new_tracks.append(pd.concat([before, routed, after]))
+        #reconstruct track
+        new_track = pd.concat(new_tracks).reset_index(drop=True)
+        #fill the time column
+        if isinstance(new_track.iloc[-1]['Time'], type(pd.NaT)):
+            new_track.iat[-1, new_track.columns.get_loc('Time')] = track.iloc[-1]['Time']
+        new_track['Time'] = new_track['Time'].interpolate(method='linear')
+        #reset track
+        agent.tracks[tid] = new_track
+    #save the agent back
+    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    save_pkl(out_file, agent) 
+
 ################################################################################

@@ -160,7 +160,7 @@ def to_df(code,
         track_id = agent.track_meta[tid]['Track ID']
         #get rid of codes
         if code is not None:
-            track = track[track[f'Code{code}']].copy() #copy? wtf?
+            track = track[track[f'Code{code}']].copy() #copy? wtf? why
         #if nothing left
         if len(track) < 1:
             continue
