@@ -919,7 +919,7 @@ def proximity_to_object(shapes,
         row['Y'] = nearest['p1'][1]
         row['geometry'] = Point(nearest['p1'])
         row['Agent ID'] = agent.agent_meta['Agent ID']
-        row['Track ID'] = tid
+        row['Track ID'] = agent.track_meta[tid]['Track ID']
         deltar = ((nearest['p1'] - nearest['p2'])**2).sum()**0.5
         row['Min Distance'] = deltar
         #add meta cols
@@ -1571,7 +1571,7 @@ def lateral_distribution(long,
                                              intersections[:,0],
                                              oldx)
         angle_diffs = (new_track['Coursing'].values - angle)%360
-        direction = np.where(angle_diffs <= 180,  'T', 'F')
+        direction = np.where(angle_diffs <= 180,  'F', 'T')
         row = pd.DataFrame({'Longitudinal Distance': intersections[:,4],
                             'Lateral Distance': intersections[:,1],
                             'TrackX': intersections[:,2],
@@ -1757,6 +1757,7 @@ def route_through_raster(array,
         #classify points inside polygon
         x = track['X'].values
         y = track['Y'].values
+        t = track['Time'].values
         result = np.logical_or(*inpoly2(np.column_stack((x, y)), 
                                         polygon, 
                                         edges,
@@ -1778,25 +1779,34 @@ def route_through_raster(array,
                 if i == 0:
                     #first point
                     p0 = x[idxs[i][0]], y[idxs[i][0]]  
+                    t0 = t[idxs[i][0]]
                 else:
                     #last point
                     p0 = x[idxs[i][-1]], y[idxs[i][-1]]  
+                    t0 = t[idxs[i][-1]]
                 before_idx = []
             #if starts outside
             else:
                 #crossing point into raster
                 _p01 = x[idxs[i][-1]], y[idxs[i][-1]]
                 _p02 = x[idxs[i+1][0]], y[idxs[i+1][0]]
-                p0 = find_intersection_points(np.array([_p01, _p02]), polygon)[:, 2:][0]
+                p0 =  find_intersection_points(np.array([_p01, _p02]), polygon)[:, 2:][0]
+                dtotal = ((_p01[0] - _p02[0])**2 + (_p01[1] - _p02[1])**2)**0.5
+                dint = ((_p01[0] - p0[0])**2 + (_p01[1] - p0[1])**2)**0.5
+                frac = dint/dtotal
                 before_idx = idxs[i]
+                dt = (t[idxs[i+1][0]] - t[idxs[i][-1]]) * frac #frac along point segment
+                t0 = t[idxs[i][-1]] + dt
             #if ends inside
             if g2[0]:
                 #if override
                 if end is not None:
                     p1 = end
+                    t1 = t[idxs[i+1][-1]]
                 #last point
                 else:
                     p1 = x[idxs[i+1][-1]], y[idxs[i+1][-1]]
+                    t1 = t[idxs[i+1][-1]]
                 after_idx = []
             #if ends outside
             else:
@@ -1804,7 +1814,12 @@ def route_through_raster(array,
                 _p11 = x[idxs[i][-1]], y[idxs[i][-1]]
                 _p12 = x[idxs[i+1][0]], y[idxs[i+1][0]]
                 p1 = find_intersection_points(np.array([_p11, _p12]), polygon)[:, 2:][0]
+                dtotal = ((_p11[0] - _p12[0])**2 + (_p11[1] - _p12[1])**2)**0.5
+                dint = ((_p11[0] - p1[0])**2 + (_p11[1] - p1[1])**2)**0.5
+                frac = dint/dtotal
                 after_idx = idxs[i+1]
+                dt = (t[idxs[i+1][0]] - t[idxs[i][-1]]) * frac #frac along point segment
+                t1 = t[idxs[i][-1]] + dt
             #get i,j coords of each point
             startij = NN_idx2(p0, coords)
             endij = NN_idx2(p1, coords)
@@ -1815,7 +1830,12 @@ def route_through_raster(array,
             new_y = coords[rows, cols, 1]
             #get new coordinates
             before = track.iloc[before_idx]
-            routed = pd.DataFrame({'X': new_x, 'Y':new_y})
+            try:
+                routed = pd.DataFrame({'X': new_x, 
+                                    'Y':new_y,
+                                    'Time':[t0, *[pd.NaT]*(len(new_x)-2), t1]})
+            except:
+                print(agent.agent_meta['Agent ID'], tid)
             after = track.iloc[after_idx]
             new_tracks.append(pd.concat([before, routed, after]))
         #reconstruct track
@@ -1825,7 +1845,7 @@ def route_through_raster(array,
             new_track.iat[-1, new_track.columns.get_loc('Time')] = track.iloc[-1]['Time']
         new_track['Time'] = new_track['Time'].interpolate(method='linear')
         #reset track
-        agent.tracks[tid] = new_track
+        agent.tracks[tid] = new_track.drop_duplicates(subset='Time')
     #save the agent back
     out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
