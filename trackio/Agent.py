@@ -162,6 +162,8 @@ class Agent:
                 self.append_data = []
             else:
                 data = self.data.copy()
+            #sort by time
+            data = data.sort_values(by='Time').reset_index(drop=True)
             #split the data by changes in data column
             splitter = data[data_col].values
             splits = np.diff(splitter)

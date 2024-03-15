@@ -32,7 +32,7 @@ def classify_in_polygon(polygon,
         y = track['Y'].values
         result = np.logical_or(*inpoly2(np.column_stack((x, y)), 
                                         polygon, 
-                                        edges))
+                                        edges, ftol=1e-8))
         track.loc[:,f'Code{code}'] = result
     #save the file
     save_pkl(pkl_files[0], agent)
@@ -65,7 +65,7 @@ def classify_in_polygons(polys,
             poly, edges = polys.iloc[i]['polys']
             result = np.logical_or(*inpoly2(np.column_stack((x, y)), 
                                             poly, 
-                                            edges))
+                                            edges, ftol=1e-8))
             codes[f'Code{polycode}'] = result
             route[f'Code{polycode}'] = result*polycode
         #reduce route to single array
@@ -135,7 +135,7 @@ def classify_turns(rate,
     
 def _classify_speed_inpoly(x, y, speeds, poly, edges,
                            speed=4, method='higher'):
-    isin = inpoly2(np.column_stack((x, y)), poly, edges)
+    isin = inpoly2(np.column_stack((x, y)), poly, edges, ftol=1e-8)
     if method == 'higher':
         return np.logical_or(*isin) & (speeds >= speed)
     else:
@@ -187,18 +187,18 @@ def _classify_trip(x,
     #one way
     startsin1 = np.logical_or(*inpoly2(np.column_stack((x[0], y[0])), 
                                        poly1, 
-                                       edges1))[0]
+                                       edges1, ftol=1e-8))[0]
     endsin2 = np.logical_or(*inpoly2(np.column_stack((x[-1], y[-1])), 
                                      poly2, 
-                                     edges2))[-1]
+                                     edges2, ftol=1e-8))[-1]
     way1 = startsin1 and endsin2
     #other way
     startsin2 = np.logical_or(*inpoly2(np.column_stack((x[0], y[0])), 
                                        poly2, 
-                                       edges2))[0]
+                                       edges2, ftol=1e-8))[0]
     endsin1 = np.logical_or(*inpoly2(np.column_stack((x[-1], y[-1])), 
                                      poly1, 
-                                     edges1))[-1]
+                                     edges1, ftol=1e-8))[-1]
     way2 = startsin2 and endsin1
     #either
     if way1 or way2:

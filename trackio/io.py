@@ -166,6 +166,8 @@ def to_df(code,
             continue
         #make point ids
         track.index = [f'{track_id}_P{i}' for i in range(len(track))]
+        #add track id
+        track.loc[:, 'Track ID'] = track_id
         #add agent meta
         meta = agent.meta
         for key,val in meta.items():

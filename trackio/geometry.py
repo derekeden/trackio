@@ -1435,8 +1435,8 @@ def imprint_geometry(polylines,
                         if len(intersection) > 0:
                             intersection = intersection[0]
                             #add the new points into the track
-                            dxi = (intersection[0] - track_segment[0][0])**2
-                            dyi = (intersection[1] - track_segment[0][1])**2
+                            dxi = (intersection[2] - track_segment[0][0])**2
+                            dyi = (intersection[3] - track_segment[0][1])**2
                             dri = (dxi+dyi)**0.5
                             dxt = (track_segment[1][0] - track_segment[0][0])**2
                             dyt = (track_segment[1][1] - track_segment[0][1])**2
@@ -1444,7 +1444,7 @@ def imprint_geometry(polylines,
                             frac = dri/drt
                             dtime = (old_time.iloc[j + 1] - old_time.iloc[j]) * frac
                             newtime = old_time.iloc[j] + dtime
-                            new_row = {'Time':newtime, 'X':intersection[0], 'Y':intersection[1]}
+                            new_row = {'Time':newtime, 'X':intersection[2], 'Y':intersection[3]}
                             new_rows.append(new_row)
             #if new points to add   
             if len(new_rows) > 0:
@@ -1454,7 +1454,7 @@ def imprint_geometry(polylines,
                 add_track = interpolate_dynamic_data(track, new_times_cumsum, old_times_cumsum)
                 add_track['X'] = add_df['X'].values
                 add_track['Y'] = add_df['Y'].values
-                new_track = pd.concat([track, add_track]).sort_values(by='Time').reset_index(drop=True)          
+                new_track = pd.concat([track, add_track]).sort_values(by='Time').drop_duplicates(subset='Time').reset_index(drop=True)          
                 agent.tracks[tid] = new_track                 
     if refresh:
         #save the agent back
