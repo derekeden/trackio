@@ -1131,6 +1131,7 @@ class Dataset:
         return self
 
     def compute_distance_travelled(self, 
+                                   relative=False,
                                    agents=None,
                                    tracks=None, 
                                    ncores=1, 
@@ -1142,7 +1143,7 @@ class Dataset:
         pkl_groups = list(zip(*self.get_files_tracks_to_process(agents, tracks)))
         #recompute in parallel
         utils.pool_caller(geometry.compute_distance_travelled,
-                          (out_pth,),
+                          (out_pth, relative),
                           pkl_groups,
                           desc,
                           ncores)  

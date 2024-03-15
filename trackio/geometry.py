@@ -517,6 +517,7 @@ def compute_acceleration(out_pth,
     save_pkl(out_file, agent) 
 
 def compute_distance_travelled(out_pth,
+                               relative,
                                args):
     #split args
     pkl_files, tracks = args
@@ -538,28 +539,31 @@ def compute_distance_travelled(out_pth,
             dy = np.diff(track['Y'].values)
             dr = (dx**2 + dy**2)**0.5
             dist = np.hstack([[0], np.cumsum(dr)])
+        #if relative 0-1
+        if relative:
+            dist = dist/dist.max()
         track.loc[:,'Distance Travelled'] = dist
     #save the agent back
     out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
 def define_circle(p1, p2, p3):
-    """
-    Returns the center and radius of the circle passing the given 3 points.
-    In case the 3 points form a line, returns (None, infinity).
-    """
-    temp = p2[:,0] * p2[:,0] + p2[:,1] * p2[:,1]
-    bc = (p1[:,0] * p1[:,0] + p1[:,1] * p1[:,1] - temp) / 2
-    cd = (temp - p3[:,0] * p3[:,0] - p3[:,1] * p3[:,1]) / 2
-    det = (p1[:,0] - p2[:,0]) * (p2[:,1] - p3[:,1]) - (p2[:,0] - p3[:,0]) * (p1[:,1] - p2[:,1])
+    # Calculate the distances (a, b, c) between each pair of points
+    a = np.linalg.norm(p2 - p3, axis=1)
+    b = np.linalg.norm(p1 - p3, axis=1)
+    c = np.linalg.norm(p1 - p2, axis=1)
     
-    det = np.where(det < 1.0e-6, np.nan, det)
+    # Calculate the semi-perimeter
+    s = (a + b + c) / 2
     
-    # Center of circle
-    cx = (bc*(p2[:,1] - p3[:,1]) - cd*(p1[:,1] - p2[:,1])) / det
-    cy = ((p1[:,0] - p2[:,0]) * cd - (p2[:,0] - p3[:,0]) * bc) / det
+    # Calculate the area of the triangle using Heron's formula
+    area = np.sqrt(s * (s - a) * (s - b) * (s - c))
     
-    radius = np.sqrt((cx - p1[:,0])**2 + (cy - p1[:,1])**2)
+    # Calculate the radius of the circumcircle
+    radius = (a * b * c) / (4 * area)
+    
+    # Handle cases where the area is zero (collinear points) to avoid division by zero
+    radius = np.where(area == 0, np.inf, radius)
     return radius
 
 def compute_radius_of_curvature(out_pth,
@@ -580,10 +584,10 @@ def compute_radius_of_curvature(out_pth,
         if len(track) < 3:
             radius = [np.nan]*len(track)
         else:
-            p0 = track[['X','Y']].iloc[:-2][['X','Y']].values
-            p1 = track[['X','Y']].iloc[1:-1][['X','Y']].values
-            p2 = track[['X','Y']].iloc[2:][['X','Y']].values
-            radius = define_circle(p0, p1, p2)
+            p1 = track[['X','Y']].iloc[:-2][['X','Y']].values
+            p2 = track[['X','Y']].iloc[1:-1][['X','Y']].values
+            p3 = track[['X','Y']].iloc[2:][['X','Y']].values
+            radius = define_circle(p1, p2, p3)
             radius = np.hstack([[np.nan], radius, [np.nan]])
         track.loc[:,'Radius of Curvature'] = radius
     #save the agent back

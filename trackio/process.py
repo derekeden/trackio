@@ -352,56 +352,72 @@ def _clip_to_shape(extent,
             mask = mask1.values & mask2.values
         dat[mask].to_csv(out_file)
 
+# Function to follow a chain from a starting point
+def follow_chain(start, connection_dict):
+    flat_chain = [start]  # Initialize with the starting element
+    while start in connection_dict:
+        start = connection_dict[start]  # Move to the next element in the chain
+        flat_chain.append(start)  # Add the new element to the flat chain
+    return flat_chain
+
 def repair_tracks_spatiotemporal(time_threshold, 
                                  dist_threshold, 
                                  out_pth,
                                  pkl_file):
-    drop = []
-    refresh = False
     #read the file
     agent = utils.read_pkl(pkl_file)
-    #dont stop until the tracks stop joining
-    while True:
-        #loop over tracks, check for tids to drop
-        i = 0 
-        tids = list(agent.tracks.keys())
-        #list of track ids to join
-        drops = []
-        #dont stop until until of track
-        while True:
-            #if end of track
-            if i+2 >= len(tids):
-                break
-            #look at two separated tracks (e.g. 0 and 2)
+    #make a dict of startstops of each track
+    meta = agent.track_meta
+    all_tids = meta.keys()
+    connections = []
+    used_tid1s = []
+    used_tid2s = []
+    for i,tid1 in enumerate(all_tids):
+        for j,tid2 in enumerate(all_tids):
+            if j<=i or tid1 in used_tid1s:
+                pass
             else:
-                t1 = agent.tracks[tids[i]]
-                t2 = agent.tracks[tids[i+2]]
-                dt = (t2['Time'].iloc[0] - t1['Time'].iloc[-1]).total_seconds()
-                dx = t2['X'].iloc[0] - t1['X'].iloc[-1]          
-                dy = t2['Y'].iloc[0] - t1['Y'].iloc[-1]   
-                dr = (dx**2+dy**2)**0.5
-                #if separated tracks meet joining criteria
+                dt = np.abs(meta[tid1]['End Time'] - meta[tid2]['Start Time']).total_seconds()
+                dx = meta[tid1]['Xend'] - meta[tid2]['Xstart']
+                dy = meta[tid1]['Yend'] - meta[tid2]['Ystart']
+                dr = (dx**2 + dy**2)**0.5
                 if dt <= time_threshold and dr <= dist_threshold:
-                    #drop the middle segment
-                    drops.append(tids[i+1])
-                    i += 2
+                    connections.append((tid1,tid2))
+                    used_tid1s.append(tid1)
+                    used_tid2s.append(tid2)
                 else:
-                    i += 1
-        #if we need to drop some tracks
-        if len(drops) > 0:
-            #mark to refresh
-            refresh = True
-            #remove the tracks we dont want
-            for drop in drops:
-                agent.tracks.pop(drop)
-            #resplit the tracks
-            agent = agent.split_tracks_spatiotemporal(time_threshold, 
-                                                        dist_threshold)
-        #otherwise finish
-        else:
-            break
-    #overwrite the file
-    if refresh:
+                    pass
+    #see if any leftover stragglers
+    all_used = list(set(used_tid1s+used_tid2s))
+    keep_tids = [tid for tid in all_tids if tid not in all_used]
+    #if same as before
+    if len(keep_tids) == len(all_tids):
+        return
+    else:
+        #find unique starting points
+        all_first_elements = {pair[0] for pair in connections}
+        all_second_elements = {pair[1] for pair in connections}
+        starting_points = all_first_elements - all_second_elements
+        #convert to dict
+        connection_dict = {k: v for k, v in connections}
+        # Collect all chains
+        all_chains = [follow_chain(start, connection_dict) for start in starting_points]
+        #sort by time just to make sure
+        all_chains = [sorted(a,key=lambda x: meta[x]['Start Time']) for a in all_chains]
+        #create new tracks by joining chains
+        new_tracks = {}
+        #loop over chains
+        for i,chain in enumerate(all_chains):
+            #connect all pertinent tracks
+            tdf = pd.concat([agent.tracks[tid] for tid in chain]).sort_values(by='Time').reset_index(drop=True)
+            new_tracks[f'T{i}'] = tdf
+        #add back any stragglers
+        start = len(new_tracks)
+        for i,tid in enumerate(keep_tids):
+            new_tracks[f'T{i+start}'] = agent.tracks[tid]
+        #overwrite the old tracks
+        agent.tracks = new_tracks
+        #overwrite the file
         out_file = f'{out_pth}/{os.path.basename(pkl_file)}'
         agent.agent_meta['File'] = out_file
         utils.save_pkl(out_file, agent)
