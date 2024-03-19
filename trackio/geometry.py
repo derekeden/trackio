@@ -1845,7 +1845,7 @@ def route_through_raster(array,
             new_track.iat[-1, new_track.columns.get_loc('Time')] = track.iloc[-1]['Time']
         new_track['Time'] = new_track['Time'].interpolate(method='linear')
         #reset track
-        agent.tracks[tid] = new_track.drop_duplicates(subset='Time')
+        agent.tracks[tid] = new_track.drop_duplicates(subset='Time').reset_index(drop=True)
     #save the agent back
     out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 

@@ -9,11 +9,14 @@ from shapely.geometry import (Polygon,
                               MultiLineString, 
                               Point, 
                               MultiPoint)
+from scipy.spatial import Voronoi
 from pyproj import CRS
 import multiprocessing as mp
 from functools import partial
 from tqdm import tqdm; GREEN = "\033[92m"; ENDC = "\033[0m" #for tqdm bar
 import pandas as pd
+import shapely
+import geopandas as gp
 
 ################################################################################
 
@@ -231,5 +234,33 @@ def NN_idx2(query, coords):
     dr = dx**2 + dy**2        
     idx2 = np.unravel_index(np.argmin(dr), dr.shape)
     return idx2
+
+def create_voronoi(centroids, buffer=500000):
+    #make buffer points
+    centroid = Point(centroids[['X','Y']].values.mean(axis=0))
+    buffer_pts = np.array(centroid.buffer(buffer, resolution=1000).exterior.xy).T
+    #combine centroids + buffer points
+    pts = np.vstack([centroids[['X','Y']].values, buffer_pts])
+    #make voronoi diagram
+    vor = Voronoi(pts)
+    #convert to poylgons
+    lines = [
+        LineString(vor.vertices[line])
+        for line in vor.ridge_vertices
+        if -1 not in line
+    ]
+    polys = list(shapely.ops.polygonize(lines))
+    #convert to geodataframe, clip to domain extent
+    voronoi = gp.GeoDataFrame(geometry=polys, crs=centroids.crs)
+    #add centroids to dataframe
+    voronoi['Code'] = np.array(list(range(len(voronoi))))+1
+    voronoi['X'] = np.nan
+    voronoi['Y'] = np.nan
+    for i in range(len(voronoi)):
+        for p in centroids.geometry:
+            if voronoi.geometry.iloc[i].intersects(p):
+                voronoi.iat[i, voronoi.columns.get_loc('X')] = p.x
+                voronoi.iat[i, voronoi.columns.get_loc('Y')] = p.y
+    return voronoi
 
 ################################################################################
