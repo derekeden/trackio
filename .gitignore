@@ -5,4 +5,4 @@ trackio/supporting/*.pdf
 trackio/tools/stats.py
 trackio/tools/ais.py
 notebooks/runall.ipynb
-notebooks/example3_bird_migrations/North-East American Canada goose migration 2015-2021.csv
+notebooks/example3_Canada_Goose_migrations/North-East American Canada goose migration 2015-2021.csv
