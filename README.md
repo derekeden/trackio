@@ -25,6 +25,10 @@ Unlike other similar libraries, `trackio` was designed for arbitrary sized datas
 
 `trackio` also has heavy operations coded in parallel to leverage powerful machines for faster analyses on large datasets. As well, `trackio` is interoperable with Dask bags, so the sky is the limit in terms of custom functionality and processing.
 
+`trackio` is largely based on Numpy, Pandas, GeoPandas, Dask, scikitlearn, GDAL, and Python's pickle module.
+
+![LIBRARIES](./trackio/supporting/readme_libs.png)
+
 ## Table of Contents
 
 <!--ts-->
