@@ -111,7 +111,7 @@ class mappers:
 _mappers = mappers()
 
 def drop_agent_meta(inp,
-                    out_pth,
+                    out_path,
                     file):
     #read agent
     agent = read_pkl(file)
@@ -119,11 +119,11 @@ def drop_agent_meta(inp,
     for i in inp:
         agent.meta.pop(i, None)
     #write it back out
-    out_file = f'{out_pth}/{os.path.basename(file)}'
+    out_file = f'{out_path}/{os.path.basename(file)}'
     save_pkl(out_file, agent)
 
 def drop_agent_data(inp,
-                    out_pth,
+                    out_path,
                     file):
     #read agent
     agent = read_pkl(file)
@@ -140,13 +140,13 @@ def drop_agent_data(inp,
             if i in a.columns:
                 a.pop(i)
     #write it back out
-    out_file = f'{out_pth}/{os.path.basename(file)}'
+    out_file = f'{out_path}/{os.path.basename(file)}'
     save_pkl(out_file, agent)
     
 def map_agent_meta(inp, 
                    out, 
                    mapper, 
-                   out_pth,
+                   out_path,
                    drop, 
                    fill,
                    file):
@@ -163,13 +163,13 @@ def map_agent_meta(inp,
         else:
             agent.meta[o] = fill
     #write it back out
-    out_file = f'{out_pth}/{os.path.basename(file)}'
+    out_file = f'{out_path}/{os.path.basename(file)}'
     save_pkl(out_file, agent)
     
 def map_agent_data(inp,
                    out,
                    mapper,
-                   out_pth,
+                   out_path,
                    drop,
                    fill,
                    args):
@@ -212,7 +212,7 @@ def map_agent_data(inp,
                     else:
                         agent._data[o] = [fill]*len(agent._data)
             #write it back out
-            out_file = f'{out_pth}/{os.path.basename(pkl_file)}'
+            out_file = f'{out_path}/{os.path.basename(pkl_file)}'
             save_pkl(out_file, agent)
     else:
         #loop over files
@@ -236,12 +236,12 @@ def map_agent_data(inp,
                     agent.tracks[tid] = tdf
             if refresh:
                 #write it back out
-                out_file = f'{out_pth}/{os.path.basename(pkl_file)}'
+                out_file = f'{out_path}/{os.path.basename(pkl_file)}'
                 save_pkl(out_file, agent)
                 
 def map_agent_data_to_codes(inp,
                             mapper,
-                            out_pth,
+                            out_path,
                             drop,
                             fill,
                             args):
@@ -286,7 +286,7 @@ def map_agent_data_to_codes(inp,
                         for val in set(m.values()):
                             agent._data[f'Code{val}'] = (mapped == val)
             #write it back out
-            out_file = f'{out_pth}/{os.path.basename(pkl_file)}'
+            out_file = f'{out_path}/{os.path.basename(pkl_file)}'
             save_pkl(out_file, agent)
     else:
         #loop over files
@@ -314,7 +314,7 @@ def map_agent_data_to_codes(inp,
                     agent.tracks[tid] = tdf
             if refresh:
                 #write it back out
-                out_file = f'{out_pth}/{os.path.basename(pkl_file)}'
+                out_file = f'{out_path}/{os.path.basename(pkl_file)}'
                 save_pkl(out_file, agent)
                   
 def make_meta_mapper(inp, pkl_file):

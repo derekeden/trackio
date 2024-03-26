@@ -205,7 +205,7 @@ def simplified_stop_indices(x, y, time, speed,
     return return_ids
 
 def reproject_crs(transformer, 
-                  out_pth, 
+                  out_path, 
                   args):
     #split args
     pkl_files, tracks = args
@@ -225,7 +225,7 @@ def reproject_crs(transformer,
                 refresh = True
             #save the agent back
             if refresh:
-                out_file = f'{out_pth}/{os.path.basename(pkl_file)}'
+                out_file = f'{out_path}/{os.path.basename(pkl_file)}'
                 save_pkl(out_file, agent)
     #if entire agents
     else:
@@ -250,11 +250,11 @@ def reproject_crs(transformer,
                 agent._data['X'] = newx
                 agent._data['Y'] = newy
             #save the agent back
-            out_file = f'{out_pth}/{os.path.basename(pkl_file)}'
+            out_file = f'{out_path}/{os.path.basename(pkl_file)}'
             save_pkl(out_file, agent)
 
 def resample_spacing(spacing, 
-                     out_pth,
+                     out_path,
                      args):
     #split args
     pkl_files, tracks = args
@@ -295,11 +295,11 @@ def resample_spacing(spacing,
                 agent.tracks[tid] = new_track
     if refresh:
         #save the agent back
-        out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+        out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
         save_pkl(out_file, agent) 
 
 def resample_time(seconds, 
-                  out_pth, 
+                  out_path, 
                   args):
     #split args
     pkl_files, tracks = args
@@ -336,11 +336,11 @@ def resample_time(seconds,
                 agent.tracks[tid] = new_track
     if refresh:
         #save the agent back
-        out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+        out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
         save_pkl(out_file, agent) 
     
 def resample_time_global(time, 
-                         out_pth, 
+                         out_path, 
                          args):
     #split args
     pkl_files, tracks = args
@@ -377,12 +377,12 @@ def resample_time_global(time,
             #update the track dataframe
             agent.tracks[tid] = new_track
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
 def compute_coursing(method, 
                      crs, 
-                     out_pth,
+                     out_path,
                      args):
     #split args
     pkl_files, tracks = args
@@ -407,11 +407,11 @@ def compute_coursing(method,
                                           method)
         track.loc[:, 'Coursing'] = coursing  
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
 def compute_turning_rate(method, 
-                         out_pth, 
+                         out_path, 
                          args):
     #split args
     pkl_files, tracks = args
@@ -443,11 +443,11 @@ def compute_turning_rate(method,
                 turn = (turn1+turn2)/2
         track.loc[:, 'Turning Rate'] = turn
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
 def compute_speed(method, 
-                  out_pth, 
+                  out_path, 
                   args):
     #split args
     pkl_files, tracks = args
@@ -481,10 +481,10 @@ def compute_speed(method,
                 speed = (speed1+speed2)/2
         track.loc[:,'Speed'] = speed
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
-def compute_acceleration(out_pth,
+def compute_acceleration(out_path,
                          method, 
                          args):
     #split args
@@ -516,10 +516,10 @@ def compute_acceleration(out_pth,
                 a = (a1+a2)/2
         track.loc[:,'Acceleration'] = a
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
-def compute_distance_travelled(out_pth,
+def compute_distance_travelled(out_path,
                                relative,
                                args):
     #split args
@@ -547,7 +547,7 @@ def compute_distance_travelled(out_pth,
             dist = dist/dist.max()
         track.loc[:,'Distance Travelled'] = dist
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
 def define_circle(p1, p2, p3):
@@ -569,7 +569,7 @@ def define_circle(p1, p2, p3):
     radius = np.where(area == 0, np.inf, radius)
     return radius
 
-def compute_radius_of_curvature(out_pth,
+def compute_radius_of_curvature(out_path,
                                 args):
     #split args
     pkl_files, tracks = args
@@ -594,10 +594,10 @@ def compute_radius_of_curvature(out_pth,
             radius = np.hstack([[np.nan], radius, [np.nan]])
         track.loc[:,'Radius of Curvature'] = radius
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
     
-def compute_sinuosity(out_pth,
+def compute_sinuosity(out_path,
                       window,
                       args):
     #split args
@@ -630,11 +630,11 @@ def compute_sinuosity(out_pth,
             sin = [np.nan]*int((window-1)/2) + sin + [np.nan]*int((window-1)/2)
         track.loc[:,'Sinuosity'] = sin
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
 def smooth_corners(refinements, 
-                   out_pth, 
+                   out_path, 
                    args):
     #DETECT THE CORNERS BASED ON THRESHOLD??
     #split args
@@ -680,7 +680,7 @@ def smooth_corners(refinements,
             new_track.loc[:, 'Y'] = coords[:,1]
     if refresh:
         #save the agent back
-        out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+        out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
         save_pkl(out_file, agent) 
 
 def start_equals_end(track):
@@ -692,7 +692,7 @@ def start_equals_end(track):
         return False
 
 def decimate_tracks(epsilon, 
-                    out_pth, 
+                    out_path, 
                     args):
     #split args
     pkl_files, tracks = args
@@ -729,7 +729,7 @@ def decimate_tracks(epsilon,
             new_track.loc[:, 'Y'] = coords[:,1]
     if refresh:
         #save the agent back
-        out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+        out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
         save_pkl(out_file, agent) 
 
 def characteristic_tracks(stop_threshold,
@@ -737,7 +737,7 @@ def characteristic_tracks(stop_threshold,
                           min_distance,
                           max_distance,
                           min_stop_duration, 
-                          out_pth,
+                          out_path,
                           inplace,
                           args):
     #split args
@@ -782,13 +782,13 @@ def characteristic_tracks(stop_threshold,
                 #update the track dataframe
                 agent.tracks[tid] = track.iloc[keeps].reset_index(drop=True)
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
 def simplify_stops(stop_threshold,
                    min_stop_duration, 
                    max_drift_distance,
-                   out_pth,
+                   out_path,
                    args):
     #split args
     pkl_files, tracks = args
@@ -826,7 +826,7 @@ def simplify_stops(stop_threshold,
                 agent.tracks[tid] = track.iloc[keeps].reset_index(drop=True)
     if refresh:
         #save the agent back
-        out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+        out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
         save_pkl(out_file, agent) 
 
 def proximity_to_object(shapes, 
@@ -1400,7 +1400,7 @@ def line_intersection(line1, line2):
         return None
 
 def imprint_geometry(polylines, 
-                     out_pth, 
+                     out_path, 
                      args):
     #split args
     pkl_files, tracks = args
@@ -1465,13 +1465,13 @@ def imprint_geometry(polylines,
                 agent.tracks[tid] = new_track                 
     if refresh:
         #save the agent back
-        out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+        out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
         save_pkl(out_file, agent)           
     return
 
 def interpolate_raster(interp, 
                        name, 
-                       out_pth, 
+                       out_path, 
                        args):
     #split args
     pkl_files, tracks = args
@@ -1490,7 +1490,7 @@ def interpolate_raster(interp,
         result = interp(xy)
         track.loc[:, name] = result
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent)    
         
 def lateral_distribution(long,
@@ -1709,7 +1709,7 @@ def generate_flow_map(characteristic_col,
             
 def reduce_to_flow_map(characteristic_col,
                        flow_col,
-                       out_pth,
+                       out_path,
                        points,
                        args):
     #split args
@@ -1731,7 +1731,7 @@ def reduce_to_flow_map(characteristic_col,
         track.loc[:,'Y'] = track[flow_col].apply(lambda x: points.get(x)[1])
         agent.tracks[tid] = track.reset_index(drop=True)
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
 def route_through_raster(array,
@@ -1739,7 +1739,7 @@ def route_through_raster(array,
                         edges,
                         coords,
                         end,
-                        out_pth,
+                        out_path,
                         kwargs,
                         args):
     #split args
@@ -1851,7 +1851,7 @@ def route_through_raster(array,
         #reset track
         agent.tracks[tid] = new_track.drop_duplicates(subset='Time').reset_index(drop=True)
     #save the agent back
-    out_file = f'{out_pth}/{os.path.basename(pkl_files[0])}'
+    out_file = f'{out_path}/{os.path.basename(pkl_files[0])}'
     save_pkl(out_file, agent) 
 
 ################################################################################

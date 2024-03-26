@@ -234,17 +234,27 @@ class Dataset:
         #return files and track ids corresponding to files
         return grouped['files'].tolist(), grouped['track'].tolist()
 
-    def _update_meta(self, out_pth, meta):
+    def _set_out_path(self, out_path):
+        if out_path is None:
+            out_path = self.data_path
+        else:
+            if not os.path.isdir(out_path):
+                os.mkdir(out_path)
+        return out_path
+    
+    def _update_meta(self, out_path, meta):
         #if written to data_pth, update self.meta
-        if out_pth == self.data_path:
+        if out_path == self.data_path:
             self.meta = meta
+            out = self
         #if written elsewhere, export the meta to there
         else:
             #export meta
-            utils.save_pkl(f'{out_pth}/{dataset_meta}', meta)
-            #change data path
-            self.data_path = out_pth
-    
+            utils.save_pkl(f'{out_path}/{dataset_meta}', meta)
+            #replace the output
+            out = Dataset(data_path=out_path)
+        return out
+
     ############################################################################
     #PREPROCESSING
     ############################################################################
@@ -289,12 +299,12 @@ class Dataset:
         #create folder if doesn't exist
         #if does, prompt user to delete, or pass continued kwarg
         #this prevents accidentally corrupting/overwriting data
-        out_pth = os.path.abspath(self.data_path)
+        out_path = os.path.abspath(self.data_path)
         if continued:
             pass
         else:
-            if not os.path.exists(out_pth):
-                os.mkdir(out_pth)
+            if not os.path.exists(out_path):
+                os.mkdir(out_path)
             else:
                 raise Exception(f'self.data_path already exists, '\
                                  'delete or pass continue=True to resume '\
@@ -304,7 +314,7 @@ class Dataset:
         #setup partials for function
         partials = (groupby,
                     chunksize,
-                    out_pth,
+                    out_path,
                     col_mapper,
                     meta_cols,
                     data_cols,
@@ -359,7 +369,7 @@ class Dataset:
                                     time=3600 * 12, #seconds, 12hrs
                                     distance=0.5, #same units as DataSet, default = 0.5deg = 55km
                                     ncores=1, 
-                                    out_pth=None,
+                                    out_path=None,
                                     remove=True,
                                     desc='Splitting tracks using spatiotemporal threshold'): 
         """
@@ -372,7 +382,7 @@ class Dataset:
 
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -382,7 +392,7 @@ class Dataset:
             time (int, optional): Time threshold in seconds for splitting. Defaults to 3600 * 12 = 12 hours.
             distance (int, float, optional): Distance threshold in the same units as DataSet (default is 0.5, approx. 55km if data is geographic). Defaults to 0.5.
             ncores (int, optional): Number of cores to use for processing. Defaults to 1.
-            out_pth (str, optional): Output path for the split tracks. Defaults to None (uses self.data_path).
+            out_path (str, optional): Output path for the split tracks. Defaults to None (uses self.data_path).
             remove (bool, optional): Whether to remove the original point files after splitting. Defaults to True.
             desc (str, optional): Description of the operation. Defaults to 'Splitting tracks using spatiotemporal threshold'.
 
@@ -390,17 +400,19 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #process tracks in parallel
         utils.pool_caller(process.split_tracks_spatiotemporal,
-                          (time, distance, out_pth, remove, 0), #split method
+                          (time, distance, out_path, remove, 0), #split method
                           pkl_groups,
                           desc, 
                           ncores)
         #refresh the status
         self.status = self._refresh_status()
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def split_tracks_by_data(self,
@@ -408,7 +420,7 @@ class Dataset:
                              tracks=None,
                              data_col='Status',
                              ncores=1, 
-                             out_pth=None,
+                             out_path=None,
                              remove=True,
                              desc='Splitting tracks by changes in data column'): 
         """
@@ -419,7 +431,7 @@ class Dataset:
 
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -428,28 +440,27 @@ class Dataset:
             tracks (optional): Specific list of track ids to be processed. If None, all tracks are processed.
             data_col (str, optional): The name of the data column to use as the criterion for splitting tracks. Defaults to 'Status'.
             ncores (int, optional): Number of cores to use for processing. Defaults to 1.
-            out_pth (str, optional): Output path for the split tracks. If None, uses the original dataset path. Defaults to None.
+            out_path (str, optional): Output path for the split tracks. If None, uses the original dataset path. Defaults to None.
             remove (bool, optional): Whether to remove the original .points files after splitting and saving the .tracks files. Defaults to True.
             desc (str, optional): Description of the operation for logging or user information. Defaults to 'Splitting tracks by changes in data column'.
 
         Returns:
             self: The Dataset instance.
         """
-
-
-
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #process tracks in parallel
         utils.pool_caller(process.split_tracks_by_data,
-                          (data_col, out_pth, remove),
+                          (data_col, out_path, remove),
                           pkl_groups,
                           desc, 
                           ncores)
         #refresh the status
         self.status = self._refresh_status()
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def split_overlapping_tracks_spatiotemporal(self,
@@ -458,7 +469,7 @@ class Dataset:
                                     time=3600 * 12, #seconds, 12hrs
                                     distance=0.5, #same units as DataSet, default = 0.5deg = 55km
                                     ncores=1, 
-                                    out_pth=None,
+                                    out_path=None,
                                     remove=True,
                                     desc='Splitting overlapping tracks using spatiotemporal threshold'): 
         """
@@ -478,7 +489,7 @@ class Dataset:
 
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -488,7 +499,7 @@ class Dataset:
             time (int, optional): Time threshold in seconds for splitting. Defaults to 3600 * 12 = 12 hours.
             distance (int, float, optional): Distance threshold in the same units as DataSet (default is 0.5, approx. 55km if data is geographic). Defaults to 0.5.
             ncores (int, optional): Number of cores to use for processing. Defaults to 1.
-            out_pth (str, optional): Output path for the split tracks. Defaults to None (uses self.data_path).
+            out_path (str, optional): Output path for the split tracks. Defaults to None (uses self.data_path).
             remove (bool, optional): Whether to remove the original point files after splitting. Defaults to True.
             desc (str, optional): Description of the operation. Defaults to 'Splitting tracks using spatiotemporal threshold'.
 
@@ -496,17 +507,19 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #process tracks in parallel
         utils.pool_caller(process.split_tracks_spatiotemporal,
-                          (time, distance, out_pth, remove, 1), #split method
+                          (time, distance, out_path, remove, 1), #split method
                           pkl_groups,
                           desc, 
                           ncores)
         #refresh the status
         self.status = self._refresh_status()
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def split_tracks_kmeans(self,
@@ -514,7 +527,7 @@ class Dataset:
                             tracks=None,
                             n_clusters=range(10),
                             feature_cols=['X','Y'],
-                            out_pth=None,
+                            out_path=None,
                             ncores=1,
                             return_error=False,
                             remove=True,
@@ -537,7 +550,7 @@ class Dataset:
 
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -546,7 +559,7 @@ class Dataset:
             tracks (list, optional): Specific list of track ids to be processed. If None, processes all tracks.
             n_clusters (int, list, range, optional): Int or list/range of numbers of clusters to try for determining the optimal number. Defaults to range(10).
             feature_cols (list of str, optional): List of column names to be used as features for clustering. Defaults to ['X', 'Y'].
-            out_pth (str, optional): Output path where the split tracks will be saved. If None, uses the current data path.
+            out_path (str, optional): Output path where the split tracks will be saved. If None, uses the current data path.
             ncores (int, optional): Number of cores to use for parallel processing. Defaults to 1.
             return_error (bool, optional): If True, returns error of the KMeans model for each number of clusters in n_clusters. Defaults to False.
             remove (bool, optional): Whether to remove the original *.points file after splitting. Defaults to True.
@@ -560,7 +573,7 @@ class Dataset:
             - tuple: (self, error), where error is a DataFrame of errors for each cluster number in n_clusters, if return_error is True.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #make sure k is int or list of ints
         msg = 'n_clusters must be int, list of ints, or range'
         assert (isinstance(n_clusters, int) or 
@@ -580,7 +593,7 @@ class Dataset:
         error = utils.pool_caller(process.split_tracks_kmeans,
                                   (n_clusters, 
                                    feature_cols, 
-                                   out_pth, 
+                                   out_path, 
                                    return_error, 
                                    remove, 
                                    optimal_method,
@@ -590,6 +603,8 @@ class Dataset:
                                   ncores)
         #refresh the status
         self.status = self._refresh_status()
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         #return
         if return_error:
             error = utils.flatten(error)
@@ -601,7 +616,7 @@ class Dataset:
                             agents=None,
                             tracks=None,
                             feature_cols=['X','Y'],
-                            out_pth=None,
+                            out_path=None,
                             ncores=1,
                             remove=True,
                             eps=0.5,
@@ -620,7 +635,7 @@ class Dataset:
 
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -628,7 +643,7 @@ class Dataset:
             agents (optional): Specific list of agent IDs to be processed.
             tracks (optional): Specific list of track IDs to be processed.
             feature_cols (list of str, optional): Feature columns to be used for clustering. Defaults to ['X', 'Y'].
-            out_pth (str, optional): Output path for the split tracks. If None, uses the current data path. Defaults to None.
+            out_path (str, optional): Output path for the split tracks. If None, uses the current data path. Defaults to None.
             ncores (int, optional): Number of cores to use for processing. Defaults to 1.
             remove (bool, optional): Whether to remove the original point files after splitting. Defaults to True.
             eps (float, optional): The maximum distance (normalized) between two samples for them to be considered as in the same neighborhood. Defaults to 0.5.
@@ -640,13 +655,13 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #process clustering in parallel
         utils.pool_caller(process.split_tracks_dbscan,
                             (feature_cols, 
-                            out_pth, 
+                            out_path, 
                             remove, 
                             eps, 
                             min_samples,
@@ -656,6 +671,8 @@ class Dataset:
                             ncores)
         #refresh the status
         self.status = self._refresh_status()
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def repair_tracks_spatiotemporal(self, 
@@ -663,7 +680,7 @@ class Dataset:
                                      time=3600 * 12, #seconds, 12hrs
                                      distance=0.5, #same units as DataSet, default = 0.5deg = 55km
                                      ncores=1, 
-                                     out_pth=None,
+                                     out_path=None,
                                      desc='Repairing tracks using spatiotemporal threshold'):
         """
         Repairs tracks by connecting disjoint segments based on spatiotemporal thresholds.
@@ -676,7 +693,7 @@ class Dataset:
         It's very similar to Dataset.split_overlapping_tracks_spatiotemporal, but you use it to fix
         erroneously split tracks.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -685,14 +702,14 @@ class Dataset:
             time (int, optional): Time threshold in seconds for connecting disjoint track segments. Defaults to 43200 seconds (12 hours).
             distance (float, optional): Distance threshold in the same units as DataSet for connecting disjoint track segments. Defaults to 0.5, which is approximately 55km if data is geographic.
             ncores (int, optional): Number of processing cores to use. Defaults to 1.
-            out_pth (str, optional): Path where the repaired tracks should be saved. If None, tracks are saved in the current data path.
+            out_path (str, optional): Path where the repaired tracks should be saved. If None, tracks are saved in the current data path.
             desc (str, optional): Description of the operation being performed. Defaults to 'Repairing tracks using spatiotemporal threshold'.
 
         Returns:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
@@ -700,12 +717,14 @@ class Dataset:
         utils.pool_caller(process.repair_tracks_spatiotemporal,
                           (time, 
                            distance, 
-                           out_pth),
+                           out_path),
                           pkl_files,
                           desc,
                           ncores)
         #refresh the status
         self.status = self._refresh_status()
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def remove_agents(self,
@@ -740,7 +759,7 @@ class Dataset:
     def remove_tracks(self,
                       tracks=None,
                       ncores=1,
-                      out_pth=None,
+                      out_path=None,
                       desc='Removing tracks from Dataset'):
         """
         Removes specified tracks from the Dataset. This operation is designed to
@@ -756,16 +775,18 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(None, tracks)))
         utils.pool_caller(process.remove_tracks,
-                          (out_pth,),
+                          (out_path,),
                           pkl_groups,
                           desc,
                           ncores)
         #refresh the status
         self.status = self._refresh_status()
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
         
     def get_track_splits(self, 
@@ -816,7 +837,7 @@ class Dataset:
                 print(msg)
                 meta = utils.std_meta()
         return meta
-    
+
     def refresh_meta(self, 
                      agents_only=False, 
                      ncores=1,
@@ -938,7 +959,7 @@ class Dataset:
     def drop_meta(self, 
                   meta_cols,
                   agents=None,
-                  out_pth=None,
+                  out_path=None,
                   ncores=1,
                   desc='Dropping meta from agents'):
         """
@@ -946,7 +967,7 @@ class Dataset:
         associated with certain agents, potentially for data cleaning, or to reduce
         dataset size.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -954,7 +975,7 @@ class Dataset:
             meta_cols (list): The meta_cols to be dropped.
             agents (list, optional): List of agent ids from which the metadata will be dropped. If None,
                                     the operation is applied to all agents.
-            out_pth (str, optional): Output path where the modified dataset should be saved. If None,
+            out_path (str, optional): Output path where the modified dataset should be saved. If None,
                                     defaults to current data_path.
             ncores (int, optional): Number of cores to use for processing. Defaults to 1.
             desc (str, optional): Description of the operation. Defaults to 'Dropping meta from agents'.
@@ -966,16 +987,18 @@ class Dataset:
         msg = 'meta_cols must be a list of meta columns'
         assert isinstance(meta_cols, list) and len(meta_cols) > 0, msg
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
         #delete data from agents in parallel
         utils.pool_caller(maps.drop_agent_meta,
-                        (meta_cols, out_pth),
+                        (meta_cols, out_path),
                         pkl_files,
                         desc,
                         ncores)
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
         
     def map_meta(self,
@@ -983,7 +1006,7 @@ class Dataset:
                 out_meta_cols,
                 meta_mappers,
                 agents=None,
-                out_pth=None,
+                out_path=None,
                 ncores=1,
                 drop=False,
                 fill=None,
@@ -994,7 +1017,7 @@ class Dataset:
         or data cleaning purposes. The transformation is defined by the `mapper` dictionary which specifies
         how input metadata values are mapped to output values.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1005,7 +1028,7 @@ class Dataset:
                     is transformed to an output value.
             agents (list, optional): A list of agent IDs indicating which agents' metadata should be transformed.
                                     If None, the operation is applied to all agents.
-            out_pth (str, optional): The file path where the dataset with the transformed metadata should be saved.
+            out_path (str, optional): The file path where the dataset with the transformed metadata should be saved.
                                     If None, the operation uses the current data_path.
             ncores (int, optional): The number of processing cores to use for the operation. Defaults to 1.
             drop (bool, optional): Whether to remove the input metadata after transformation. Defaults to False,
@@ -1022,16 +1045,18 @@ class Dataset:
         msg = 'out_meta_cols is not the same length as meta_cols'
         assert len(meta_cols) == len(out_meta_cols), msg
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
         #map metadata to agents in parallel
         utils.pool_caller(maps.map_agent_meta,
-                          (meta_cols, out_meta_cols, meta_mappers, out_pth, drop, fill),
+                          (meta_cols, out_meta_cols, meta_mappers, out_path, drop, fill),
                           pkl_files,
                           desc,
                           ncores)
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def make_data_mapper(self,
@@ -1086,7 +1111,7 @@ class Dataset:
     def drop_data(self, 
                   data_cols,
                   agents=None,
-                  out_pth=None,
+                  out_path=None,
                   ncores=1,
                   desc='Dropping dynamic data from agents'):
         """
@@ -1094,7 +1119,7 @@ class Dataset:
         associated with certain agents, potentially for data cleaning, or to reduce
         dataset size.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1102,7 +1127,7 @@ class Dataset:
             data_cols (list): The data_cols to be dropped.
             agents (list, optional): List of agent ids from which the metadata will be dropped. If None,
                                     the operation is applied to all agents.
-            out_pth (str, optional): Output path where the modified dataset should be saved. If None,
+            out_path (str, optional): Output path where the modified dataset should be saved. If None,
                                     defaults to current data_path.
             ncores (int, optional): Number of cores to use for processing. Defaults to 1.
             desc (str, optional): Description of the operation. Defaults to 'Dropping dynamic data from agents'.
@@ -1114,16 +1139,18 @@ class Dataset:
         msg = 'data_cols must be a list of data columns'
         assert isinstance(data_cols, list) and len(data_cols) > 0, msg
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
         #delete data from agents in parallel
         utils.pool_caller(maps.drop_agent_data,
-                        (data_cols, out_pth),
+                        (data_cols, out_path),
                         pkl_files,
                         desc,
                         ncores)
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def map_data(self,
@@ -1132,7 +1159,7 @@ class Dataset:
                 data_mappers={},
                 agents=None,
                 tracks=None,
-                out_pth=None,
+                out_path=None,
                 ncores=1,
                 drop=False,
                 fill=None,
@@ -1143,7 +1170,7 @@ class Dataset:
         or data cleaning purposes. The transformation is defined by the mapper dictionary which specifies
         how input data values are mapped to output values.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1154,7 +1181,7 @@ class Dataset:
                     is transformed to an output value.
             agents (list, optional): A list of agent IDs indicating which agents' data should be transformed.
                                     If None, the operation is applied to all agents.
-            out_pth (str, optional): The file path where the dataset with the transformed data should be saved.
+            out_path (str, optional): The file path where the dataset with the transformed data should be saved.
                                     If None, the operation uses the current data_path.
             ncores (int, optional): The number of processing cores to use for the operation. Defaults to 1.
             drop (bool, optional): Whether to remove the input data column(s) after transformation. Defaults to False.
@@ -1170,15 +1197,17 @@ class Dataset:
         msg = 'out_data_cols is not the same length as data_cols'
         assert len(data_cols) == len(out_data_cols), msg
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #map agent data in parallel
         utils.pool_caller(maps.map_agent_data,
-                          (data_cols, out_data_cols, data_mappers, out_pth, drop, fill),
+                          (data_cols, out_data_cols, data_mappers, out_path, drop, fill),
                           pkl_groups,
                           desc,
                           ncores)
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
 
     def map_data_to_codes(self,
@@ -1186,7 +1215,7 @@ class Dataset:
                           data_mappers,
                           agents=None,
                           tracks=None,
-                          out_pth=None,
+                          out_path=None,
                           ncores=1,
                           drop=False,
                           fill=-1,
@@ -1206,7 +1235,7 @@ class Dataset:
         in the Dataset.agents and Dataset.tracks attributes, which could make for faster and more
         efficient querying.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1216,7 +1245,7 @@ class Dataset:
                     is transformed to an output value. All values must be integers.
             agents (list, optional): A list of agent IDs indicating which agents' data should be transformed.
                                     If None, the operation is applied to all agents.
-            out_pth (str, optional): The file path where the dataset with the transformed data should be saved.
+            out_path (str, optional): The file path where the dataset with the transformed data should be saved.
                                     If None, the operation uses the current data_path.
             ncores (int, optional): The number of processing cores to use for the operation. Defaults to 1.
             drop (bool, optional): Whether to remove the input data column(s) after transformation. Defaults to False.
@@ -1238,24 +1267,18 @@ class Dataset:
         #check fill value
         assert isinstance(fill, int), 'fill value must be integer'
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #map agent data in parallel
         utils.pool_caller(maps.map_agent_data_to_codes,
-                          (data_cols, data_mappers, out_pth, drop, fill),
+                          (data_cols, data_mappers, out_path, drop, fill),
                           pkl_groups,
                           desc,
                           ncores)
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
-
-    def set_out_pth(self, out_pth):
-        if out_pth is None:
-            out_pth = self.data_path
-        else:
-            if not os.path.isdir(out_pth):
-                os.mkdir(out_pth)
-        return out_pth
 
     ############################################################################
     #FETCHERS
@@ -1503,14 +1526,14 @@ class Dataset:
                       agents=None,
                       tracks=None, 
                       ncores=1, 
-                      out_pth=None,
+                      out_path=None,
                       desc='Reprojecting CRS'):
         """
         Reprojects the coordinate reference system (CRS) of the dataset's geographic data to a new CRS.
 
         The target CRS can be a EPSG code, WKT string, pyproj.CRS object, etc.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1523,7 +1546,7 @@ class Dataset:
                                     are specified.
             ncores (int, optional): The number of processing cores to use for the reprojection operation. Defaults
                                     to 1.
-            out_pth (str, optional): The file path where the dataset with the reprojected geographic data should be
+            out_path (str, optional): The file path where the dataset with the reprojected geographic data should be
                                     saved. If None, it defaults to the current data_path.
             desc (str, optional): A brief description of the reprojection operation. Defaults to 'Reprojecting CRS'.
 
@@ -1531,7 +1554,7 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #get crs
@@ -1546,7 +1569,7 @@ class Dataset:
             transformer = Transformer.from_crs(crs1, crs2, always_xy=True)
             #reproject in parallel
             utils.pool_caller(geometry.reproject_crs,
-                                (transformer, out_pth),
+                                (transformer, out_path),
                                 pkl_groups,
                                 desc, 
                                 ncores)
@@ -1556,7 +1579,7 @@ class Dataset:
             meta['X'] = crs2.axis_info[0].unit_name
             meta['Y'] = crs2.axis_info[1].unit_name
             #update meta
-            self._update_meta(out_pth, meta)
+            self = self._update_meta(out_path, meta)
         return self
          
     def resample_spacing(self, 
@@ -1564,7 +1587,7 @@ class Dataset:
                          agents=None,
                          tracks=None, 
                          ncores=1, 
-                         out_pth=None,
+                         out_path=None,
                          desc='Resampling track spacing'):
         """
         Resamples the points of tracks to a specified spacing. This is useful for standardizing
@@ -1572,7 +1595,7 @@ class Dataset:
         spatial intervals. The resampling process can either interpolate or decimate points to achieve the
         desired spacing.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1588,7 +1611,7 @@ class Dataset:
                                     considered.
             ncores (int, optional): The number of processing cores to use for the resampling operation. Defaults
                                     to 1.
-            out_pth (str, optional): The file path where the dataset with the resampled tracks should be saved.
+            out_path (str, optional): The file path where the dataset with the resampled tracks should be saved.
                                     If None, it assumes the current data_path.
             desc (str, optional): A brief description of the resampling operation. Defaults to 'Resampling track spacing'.
 
@@ -1596,17 +1619,17 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #resample in parallel
         utils.pool_caller(geometry.resample_spacing,
-                          (spacing, out_pth),
+                          (spacing, out_path),
                           pkl_groups,
                           desc,
                           ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        self = self._update_meta(out_path, self.meta)
         return self
         
     def resample_time(self, 
@@ -1614,7 +1637,7 @@ class Dataset:
                       agents=None,
                       tracks=None, 
                       ncores=1, 
-                      out_pth=None,
+                      out_path=None,
                       desc='Resampling track timing'):
         """
         Resamples the points of tracks to a specified temporal spacing. This is useful for standardizing
@@ -1622,7 +1645,7 @@ class Dataset:
         temporal intervals. The resampling process can either interpolate or decimate points to achieve the
         desired temporal spacing.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1635,7 +1658,7 @@ class Dataset:
                                     considered.
             ncores (int, optional): The number of processing cores to use for the resampling operation. Defaults
                                     to 1.
-            out_pth (str, optional): The file path where the dataset with the resampled tracks should be saved.
+            out_path (str, optional): The file path where the dataset with the resampled tracks should be saved.
                                     If None, it assumes the current data_path.
             desc (str, optional): A brief description of the resampling operation. Defaults to 'Resampling track timing'.
 
@@ -1643,17 +1666,17 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #resample in parallel
         utils.pool_caller(geometry.resample_time,
-                          (seconds, out_pth),
+                          (seconds, out_path),
                           pkl_groups,
                           desc,
                           ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def resample_time_global(self, 
@@ -1661,7 +1684,7 @@ class Dataset:
                              agents=None,
                              tracks=None, 
                              ncores=1, 
-                             out_pth=None,
+                             out_path=None,
                              desc='Resampling tracks to global time axis'):
         """
         Resamples the points of tracks to a global time axis.
@@ -1672,7 +1695,7 @@ class Dataset:
 
         This may also be useful for standardizing data for ML approaches.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1686,7 +1709,7 @@ class Dataset:
                                     considered.
             ncores (int, optional): The number of processing cores to use for the resampling operation. Defaults
                                     to 1.
-            out_pth (str, optional): The file path where the dataset with the resampled tracks should be saved.
+            out_path (str, optional): The file path where the dataset with the resampled tracks should be saved.
                                     If None, it assumes the current data_path.
             desc (str, optional): A brief description of the resampling operation. Defaults to 'Resampling tracks to global time axis'.
 
@@ -1704,24 +1727,24 @@ class Dataset:
         #convert times to seconds
         _time = time.astype(np.int64)/1e9 #seconds
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #resample in parallel
         utils.pool_caller(geometry.resample_time_global,
-                          (_time, out_pth),
+                          (_time, out_path),
                           pkl_groups,
                           desc,
                           ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        self = self._update_meta(out_path, self.meta)
         return self    
 
     def compute_coursing(self, 
                          agents=None,
                          tracks=None, 
                          ncores=1, 
-                         out_pth=None,
+                         out_path=None,
                          method='middle',
                          desc='Computing coursing'):
         """
@@ -1739,7 +1762,7 @@ class Dataset:
 
         If 'middle', it uses an average of both and no filling is required.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
         
@@ -1751,7 +1774,7 @@ class Dataset:
                                     coursing is computed for all tracks associated with the specified agents.
                                     If both are None, coursing is computed for all tracks in the dataset.
             ncores (int, optional): The number of processing cores to use for the computation. Defaults to 1.
-            out_pth (str, optional): The file path where the results of the coursing computation should be saved.
+            out_path (str, optional): The file path where the results of the coursing computation should be saved.
                                     If None, it uses the current data_path.
             method (str, optional): The method used to compute coursing, must be one of ['forward', 'middle', 'backward'].
             desc (str, optional): A brief description of the coursing computation operation. Defaults to 'Computing coursing'.
@@ -1763,26 +1786,26 @@ class Dataset:
         msg = 'method must be backward, middle, or forward'
         assert method in ['backward','middle','forward'], msg
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #recompute in parallel
         utils.pool_caller(geometry.compute_coursing,
-                          (method, self.meta['CRS'], out_pth),
+                          (method, self.meta['CRS'], out_path),
                           pkl_groups,
                           desc,
                           ncores)       
         #update meta
         meta = self.meta.copy()
         meta['Coursing'] = 'degrees'
-        self._update_meta(out_pth, meta)
+        self = self._update_meta(out_path, meta)
         return self
     
     def compute_turning_rate(self, 
                              agents=None,
                              tracks=None, 
                              ncores=1, 
-                             out_pth=None,
+                             out_path=None,
                              method='middle',
                              desc='Computing turning rate'):
         """
@@ -1803,7 +1826,7 @@ class Dataset:
 
         If 'middle', it uses an average of both and no filling is required.
         
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1815,7 +1838,7 @@ class Dataset:
                                     turning rate is computed for all tracks associated with the specified agents.
                                     If both are None, turning rate is computed for all tracks in the dataset.
             ncores (int, optional): The number of processing cores to use for the computation. Defaults to 1.
-            out_pth (str, optional): The file path where the results of the turning rate computation should be saved.
+            out_path (str, optional): The file path where the results of the turning rate computation should be saved.
                                     If None, it uses the current data_path.
             method (str, optional): The method used to compute turning rate, must be one of ['forward', 'middle', 'backward'].
             desc (str, optional): A brief description of the turning rate computation operation. Defaults to 'Computing turning rate'.
@@ -1827,26 +1850,26 @@ class Dataset:
         msg = 'method must be backward, middle, or forward'
         assert method in ['backward','middle','forward'], msg
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #recompute in parallel
         utils.pool_caller(geometry.compute_turning_rate,
-                          (method, out_pth),
+                          (method, out_path),
                           pkl_groups,
                           desc,
                           ncores)       
         #update meta
         meta = self.meta.copy()
         meta['Turning Rate'] = 'degrees/sec'
-        self._update_meta(out_pth, meta)
+        self = self._update_meta(out_path, meta)
         return self
 
     def compute_speed(self, 
                       agents=None,
                       tracks=None, 
                       ncores=1, 
-                      out_pth=None,
+                      out_path=None,
                       method='middle',
                       desc='Computing speed'):
         """
@@ -1864,7 +1887,7 @@ class Dataset:
 
         If 'middle', it uses an average of both and no filling is required.
         
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1876,7 +1899,7 @@ class Dataset:
                                     speed is computed for all tracks associated with the specified agents.
                                     If both are None, speed is computed for all tracks in the dataset.
             ncores (int, optional): The number of processing cores to use for the computation. Defaults to 1.
-            out_pth (str, optional): The file path where the results of the speed computation should be saved.
+            out_path (str, optional): The file path where the results of the speed computation should be saved.
                                     If None, it uses the current data_path.
             method (str, optional): The method used to compute speed, must be one of ['forward', 'middle', 'backward'].
             desc (str, optional): A brief description of the speed computation operation. Defaults to 'Computing speed'.
@@ -1888,26 +1911,26 @@ class Dataset:
         msg = 'method must be backward, middle, or forward'
         assert method in ['backward','middle','forward'], msg
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #recompute in parallel
         utils.pool_caller(geometry.compute_speed,
-                          (method, out_pth),
+                          (method, out_path),
                           pkl_groups,
                           desc,
                           ncores)  
         #update meta
         meta = self.meta.copy()
         meta['Speed'] = f"{meta['X']}/second"
-        self._update_meta(out_pth, meta)
+        self = self._update_meta(out_path, meta)
         return self
 
     def compute_acceleration(self, 
                              agents=None,
                              tracks=None, 
                              ncores=1, 
-                             out_pth=None,
+                             out_path=None,
                              method='middle',
                              desc='Computing acceleration'):
         """
@@ -1928,7 +1951,7 @@ class Dataset:
 
         If 'middle', it uses an average of both and no filling is required.
         
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -1940,7 +1963,7 @@ class Dataset:
                                     acceleration is computed for all tracks associated with the specified agents.
                                     If both are None, acceleration is computed for all tracks in the dataset.
             ncores (int, optional): The number of processing cores to use for the computation. Defaults to 1.
-            out_pth (str, optional): The file path where the results of the acceleration computation should be saved.
+            out_path (str, optional): The file path where the results of the acceleration computation should be saved.
                                     If None, it uses the current data_path.
             method (str, optional): The method used to compute acceleration, must be one of ['forward', 'middle', 'backward'].
             desc (str, optional): A brief description of the acceleration computation operation. Defaults to 'Computing acceleration'.
@@ -1952,19 +1975,19 @@ class Dataset:
         msg = 'method must be backward, middle, or forward'
         assert method in ['backward','middle','forward'], msg
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #recompute in parallel
         utils.pool_caller(geometry.compute_acceleration,
-                          (out_pth, method),
+                          (out_path, method),
                           pkl_groups,
                           desc,
                           ncores)  
         #update meta
         meta = self.meta.copy()
         meta['Acceleration'] = f"{meta['Speed']}/second"
-        self._update_meta(out_pth, meta)
+        self = self._update_meta(out_path, meta)
         return self
 
     def compute_distance_travelled(self, 
@@ -1972,7 +1995,7 @@ class Dataset:
                                    agents=None,
                                    tracks=None, 
                                    ncores=1, 
-                                   out_pth=None,
+                                   out_path=None,
                                    desc='Computing distance travelled along tracks'):
         """
         Computes the total distance travelled along each track. This gets added
@@ -1989,12 +2012,12 @@ class Dataset:
                                     This allows for focusing on particular tracks of interest. If None, the computation
                                     applies to tracks related to the specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the computation. Defaults to 1.
-            out_pth (str, optional): The file path where the dataset with the computed distances should be saved.
+            out_path (str, optional): The file path where the dataset with the computed distances should be saved.
                                     If None, it assumes the current data_path.
             desc (str, optional): A brief description of the operation. Defaults to 'Computing distance travelled
                                 along tracks'.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -2002,26 +2025,26 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #recompute in parallel
         utils.pool_caller(geometry.compute_distance_travelled,
-                          (out_pth, relative),
+                          (out_path, relative),
                           pkl_groups,
                           desc,
                           ncores)  
         #update meta
         meta = self.meta.copy()
         meta['Distance Travelled'] = meta['X']
-        self._update_meta(out_pth, meta)
+        self = self._update_meta(out_path, meta)
         return self
 
     def compute_radius_of_curvature(self, 
                                    agents=None,
                                    tracks=None, 
                                    ncores=1, 
-                                   out_pth=None,
+                                   out_path=None,
                                    desc='Computing radius of curvature'):
         """
         Computes the radius of curvature for each point along tracks. This gets added
@@ -2034,7 +2057,7 @@ class Dataset:
         at the middle point. Naturally, this results in a nan value for the first and last points of the tracks, 
         since they only have 1 neighbour.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -2045,7 +2068,7 @@ class Dataset:
                                     This allows for focusing on particular tracks of interest. If None, the computation
                                     applies to tracks related to the specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the computation. Defaults to 1.
-            out_pth (str, optional): The file path where the dataset with the computed radius of curvature should be saved.
+            out_path (str, optional): The file path where the dataset with the computed radius of curvature should be saved.
                                     If None, it assumes the current data_path.
             desc (str, optional): A brief description of the operation. Defaults to 'Computing radius of curvature'.
 
@@ -2053,26 +2076,26 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #recompute in parallel
         utils.pool_caller(geometry.compute_radius_of_curvature,
-                          (out_pth,),
+                          (out_path,),
                           pkl_groups,
                           desc,
                           ncores)  
         #update meta
         meta = self.meta.copy()
         meta['Radius of Curvature'] = meta['X']
-        self._update_meta(out_pth, meta)
+        self = self._update_meta(out_path, meta)
         return self
 
     def compute_sinuosity(self, 
                           agents=None,
                           tracks=None, 
                           ncores=1, 
-                          out_pth=None,
+                          out_path=None,
                           window=3,
                           desc='Computing sinuosity'):
         """
@@ -2083,7 +2106,7 @@ class Dataset:
         (distance between start and end points) for the window of points. Naturally, this will result in nan values
         at the beginning and end of the track depending on how large the window is.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -2096,7 +2119,7 @@ class Dataset:
                                     This allows for focusing on particular tracks of interest. If None, the computation
                                     applies to tracks related to the specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the computation. Defaults to 1.
-            out_pth (str, optional): The file path where the dataset with the computed sinuosity should be saved.
+            out_path (str, optional): The file path where the dataset with the computed sinuosity should be saved.
                                     If None, it assumes the current data_path.
             desc (str, optional): A brief description of the operation. Defaults to 'Computing sinuosity'.
 
@@ -2106,19 +2129,19 @@ class Dataset:
         #assert odd window number to be centered on each point
         assert window%2 > 0, 'window must be an odd number'
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #recompute in parallel
         utils.pool_caller(geometry.compute_sinuosity,
-                          (out_pth, window),
+                          (out_path, window),
                           pkl_groups,
                           desc,
                           ncores)  
         #update meta
         meta = self.meta.copy()
         meta['Sinuosity'] = 'non-dimensional'
-        self._update_meta(out_pth, meta)
+        self = self._update_meta(out_path, meta)
         return self
 
     def smooth_corners(self, 
@@ -2126,7 +2149,7 @@ class Dataset:
                        agents=None,
                        tracks=None, 
                        ncores=1, 
-                       out_pth=None,
+                       out_path=None,
                        desc='Smoothing sharp corners'):
         """
         Smooths sharp corners/turns in tracks using a iterative weighted averaging technique.
@@ -2137,7 +2160,7 @@ class Dataset:
 
         Here, linear interpolation is used to fill any dynamic data at new points.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -2149,7 +2172,7 @@ class Dataset:
                                     This allows for focusing on particular tracks of interest. If None, the operation
                                     applies to tracks related to the specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the opreation. Defaults to 1.
-            out_pth (str, optional): The file path where the resulting dataset should be saved.
+            out_path (str, optional): The file path where the resulting dataset should be saved.
                                     If None, it assumes the current data_path.
             desc (str, optional): A brief description of the operation. Defaults to 'Smoothing sharp corners'.
 
@@ -2157,17 +2180,17 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #resample in parallel
         utils.pool_caller(geometry.smooth_corners,
-                          (refinements, out_pth),
+                          (refinements, out_path),
                           pkl_groups,
                           desc,
                           ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        self = self._update_meta(out_path, self.meta)
         return self
             
     def decimate_tracks(self, 
@@ -2175,7 +2198,7 @@ class Dataset:
                         agents=None,
                         tracks=None, 
                         ncores=1, 
-                        out_pth=None,
+                        out_path=None,
                         desc='Decimating tracks'):
         """
         Decimates track geometry using the Douglas-Peucker algorithm. 
@@ -2188,7 +2211,7 @@ class Dataset:
         Here, epsilon is in the units of the dataset coordinate system. I.e. degrees for geographic,
         meters for UTM, etc.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -2206,7 +2229,7 @@ class Dataset:
                                     agents are specified.
             ncores (int, optional): The number of processing cores to use for the decimation operation. 
                                     Defaults to 1.
-            out_pth (str, optional): The file path where the dataset with decimated tracks should be saved. 
+            out_path (str, optional): The file path where the dataset with decimated tracks should be saved. 
                                     If None, it assumes the current data_path.
             desc (str, optional): A brief description of the decimation operation. Defaults to 'Decimating tracks'.
 
@@ -2214,17 +2237,17 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #resample in parallel
         utils.pool_caller(geometry.decimate_tracks,
-                          (epsilon, out_pth),
+                          (epsilon, out_path),
                           pkl_groups,
                           desc,
                           ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        self = self._update_meta(out_path, self.meta)
         return self
        
     def characteristic_tracks(self,
@@ -2236,7 +2259,7 @@ class Dataset:
                               agents=None,
                               tracks=None, 
                               ncores=1, 
-                              out_pth=None,
+                              out_path=None,
                               inplace=False,
                               desc='Extracting characteristic tracks'):
         """
@@ -2258,7 +2281,7 @@ class Dataset:
         pass inplace=False, a boolean "Charactersitic" column will be added to the track dataframes that is
         True at characteristic points.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -2278,7 +2301,7 @@ class Dataset:
                                         tracks of interest. If None, the operation applies to tracks related to the specified 
                                         agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the analysis. Defaults to 1.
-            out_pth (str, optional): The file path where the dataset with the extracted characteristic tracks should be saved. 
+            out_path (str, optional): The file path where the dataset with the extracted characteristic tracks should be saved. 
                                         If None, it assumes the current data_path.
             inplace (bool, optional): Whether to modify the dataset in place, or add a Characteristic column.
                                       Defaults to False, indicating not modifying in place.
@@ -2288,23 +2311,25 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
+        #process in parallel
         utils.pool_caller(geometry.characteristic_tracks,
                           (stop_threshold,
                            turn_threshold,
                            min_distance,
                            max_distance,
                            min_stop_duration,
-                           out_pth,
+                           out_path,
                            inplace),
                           pkl_groups,
                           desc,
                           ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        meta = self.meta.copy()
+        meta['Characteristic'] = 'Characteristic Points'
+        self = self._update_meta(out_path, meta)
         return self
     
     def simplify_stops(self, 
@@ -2314,7 +2339,7 @@ class Dataset:
                        agents=None,
                        tracks=None, 
                        ncores=1, 
-                       out_pth=None,
+                       out_path=None,
                        desc='Simplifying stops along tracks'):
         """
         Simplifies and reduces the number of points that define stop events along tracks.
@@ -2324,7 +2349,7 @@ class Dataset:
         (e.g. duration). In particular, this has proved useful to simplify AIS vessel tracks
         where AIS transponders have been left on at a mooring location for an extended period of time.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
         
@@ -2343,7 +2368,7 @@ class Dataset:
                                     to the specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the simplification operation. Defaults to 1, 
                                     implying serial processing. Utilizing more cores can speed up the process for large datasets.
-            out_pth (str, optional): The file path where the dataset with simplified stops should be saved. If None, it assumes
+            out_path (str, optional): The file path where the dataset with simplified stops should be saved. If None, it assumes
                                     the current data_path.
             desc (str, optional): A brief description of the operation. Defaults to 'Simplifying stops along tracks'.
 
@@ -2351,7 +2376,7 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #resample in parallel
@@ -2359,12 +2384,12 @@ class Dataset:
                           (stop_threshold,
                            min_stop_duration,
                            max_drift_distance,
-                           out_pth),
+                           out_path),
                           pkl_groups,
                           desc,
                           ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def imprint_geometry(self, 
@@ -2372,7 +2397,7 @@ class Dataset:
                          agents=None,
                          tracks=None, 
                          ncores=1, 
-                         out_pth=None,
+                         out_path=None,
                          desc='Imprinting geometry into tracks'):
         """
         Imprints a specified geometric shape onto track data. Shape must be a shapely LineString, 
@@ -2384,7 +2409,7 @@ class Dataset:
 
         Here, linear interpolation is used to fill any dynamic data at new points.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -2398,7 +2423,7 @@ class Dataset:
                                     the operation applies to tracks related to the specified agents or all tracks
                                     if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the operation. Defaults to 1.
-            out_pth (str, optional): The file path where the dataset with the imprinted geometric information
+            out_path (str, optional): The file path where the dataset with the imprinted geometric information
                                     should be saved. If None, it assumes the current data_path.
             desc (str, optional): A brief description of the operation. Defaults to 'Imprinting geometry into tracks'.
 
@@ -2413,17 +2438,17 @@ class Dataset:
                                   MultiPolygon)), msg
         polylines = utils.prepare_polylines(shape)
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #resample in parallel
         utils.pool_caller(geometry.imprint_geometry,
-                          (polylines, out_pth),
+                          (polylines, out_path),
                           pkl_groups,
                           desc,
                           ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        self = self._update_meta(out_path, self.meta)
         return self
 
     def interpolate_raster(self,
@@ -2432,8 +2457,9 @@ class Dataset:
                            agents=None,
                            tracks=None,
                            ncores=1,
-                           out_pth=None,
+                           out_path=None,
                            method='linear',
+                           meta='Raster Values',
                            desc='Interpolating raster to tracks'):
         """
         Interpolates values from a raster onto the track points, effectively assigning raster-based
@@ -2458,10 +2484,11 @@ class Dataset:
                                     operation applies to tracks related to the specified agents or all tracks if no agents
                                     are specified.
             ncores (int, optional): The number of processing cores to use for the interpolation operation. Defaults to 1.
-            out_pth (str, optional): The file path where the dataset with interpolated raster values should be saved. If None,
+            out_path (str, optional): The file path where the dataset with interpolated raster values should be saved. If None,
                                     the current data_path is assumed.
             method (str, optional): The method of interpolation to perform. Supported are “linear”, “nearest”, “slinear”, “cubic”, “quintic” and “pchip”.
                                     Defaults to 'linear'.
+            meta (str, optional): A description of this data field for the Dataset.meta attribute. E.g. temperature, bathymetry, wind speed, etc.
             desc (str, optional): A brief description of the operation. Defaults to 'Interpolating raster to tracks'.
 
         Returns:
@@ -2481,17 +2508,19 @@ class Dataset:
                                          fill_value=np.nan,
                                          method=method)
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #resample in parallel
         utils.pool_caller(geometry.interpolate_raster,
-                          (interp, name, out_pth),
+                          (interp, name, out_path),
                           pkl_groups,
                           desc,
                           ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        _meta = self.meta.copy()
+        _meta[name] = meta
+        self = self._update_meta(out_path, _meta)
         return self
 
     def encounters(self, #first ds
@@ -3178,7 +3207,7 @@ class Dataset:
                           agents=None,
                           tracks=None,
                           ncores=1,
-                          out_pth=None,
+                          out_path=None,
                           desc='Generating flow map from polygons'):
         """
         This works the same way as Dataset.generate_flow_map, but instead the tracks are actually
@@ -3212,7 +3241,7 @@ class Dataset:
             self: The Dataset instance.
         """
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #make sure it is proper format
         msg = 'Polygons must be gp.GeoDataFrame with Code, X, Y columns'
         assert isinstance(polygons, gp.GeoDataFrame), msg
@@ -3227,20 +3256,20 @@ class Dataset:
         utils.pool_caller(geometry.reduce_to_flow_map,
                         (characteristic_col, 
                         flow_col,
-                        out_pth,
+                        out_path,
                         points),
                         pkl_groups,
                         desc,
                         ncores)
         #update meta
-        self._update_meta(out_pth, self.meta)
+        self = self._update_meta(out_path, self.meta)
         return self
     
     def route_through_raster(self, 
                              ras,
                              agents=None,
                              tracks=None,
-                             out_pth=None,
+                             out_path=None,
                              end=None,
                              desc='Routing tracks through raster',
                              ncores=1,
@@ -3273,7 +3302,7 @@ class Dataset:
         the timing and speeds derived from points coming from this algorithm should not be trusted. The
         algorithm is more geared towards geometric/spatial rerouting.
 
-        If you pass a directory for the out_pth kwarg, the *.tracks files will be saved to this directory,
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
         in the original self.data_path location.
 
@@ -3285,7 +3314,7 @@ class Dataset:
                                     selective application of the routing process to certain tracks. If None, the
                                     operation applies to tracks related to the specified agents or all tracks if no
                                     agents are specified.
-            out_pth (str, optional): The file path where the dataset with the routed tracks should be saved. If None,
+            out_path (str, optional): The file path where the dataset with the routed tracks should be saved. If None,
                                     it assumes the current data_path.
             end (optional): An optional (x,y) end location that will override the default end location for the routing.
             desc (str, optional): A brief description of the operation. Defaults to 'Routing tracks through raster'.
@@ -3299,7 +3328,7 @@ class Dataset:
         msg = 'raster must be a rasterio object'
         assert isinstance(ras, rio.io.DatasetReader), msg
         #set out path
-        out_pth = self.set_out_pth(out_pth)
+        out_path = self._set_out_path(out_path)
         #get the raster info
         b = ras.bounds
         polygon, edges = utils.format_polygon(box(b.left, b.bottom, b.right, b.top))
@@ -3319,11 +3348,13 @@ class Dataset:
                            edges, 
                            coords,
                            end,
-                           out_pth,
+                           out_path,
                            kwargs),
                           pkl_groups,
                           desc,
                           ncores)
+        #update meta
+        self = self._update_meta(out_path, self.meta)
         return self
 
     ############################################################################

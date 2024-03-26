@@ -21,7 +21,7 @@ must_cols = ['Time','X','Y']
 
 def group_points(groupby, 
                chunksize,
-               out_pth,
+               out_path,
                col_mapper,
                meta_cols,
                data_cols,
@@ -41,7 +41,7 @@ def group_points(groupby,
         for chunk in reader:
             _group_points(chunk, 
                           groupby,
-                          out_pth,
+                          out_path,
                           col_mapper,
                           meta_cols,
                           data_cols,
@@ -51,7 +51,7 @@ def group_points(groupby,
     if isinstance(raw_file, pd.DataFrame):
         _group_points(raw_file,
                       groupby,
-                      out_pth,
+                      out_path,
                       col_mapper,
                       meta_cols,
                       data_cols,
@@ -60,7 +60,7 @@ def group_points(groupby,
 
 def _group_points(chunk, 
                   groupby, 
-                  out_pth, 
+                  out_path, 
                   col_mapper,
                   meta_cols,
                   data_cols,
@@ -113,12 +113,12 @@ def _group_points(chunk,
         data = pd.DataFrame(group[data_cols].to_dict(orient='list'))
         agent = Agent(aid, meta, data)
         #append the pickle
-        outfile = f"{out_pth}/{aid}_{pid}.points"
+        outfile = f"{out_path}/{aid}_{pid}.points"
         utils.append_pkl(outfile, agent)
 
 def split_tracks_spatiotemporal(time, 
                                 distance, 
-                                out_pth,
+                                out_path,
                                 remove,
                                 method,
                                 args):
@@ -134,7 +134,7 @@ def split_tracks_spatiotemporal(time,
     #now rewrite the pickles
     new_name = f'{agent.meta["Agent ID"]}.tracks'
     # out_file = pkl_files[0].replace(os.path.basename(pkl_file), new_name)
-    out_file = os.path.abspath(os.path.join(out_pth, new_name))
+    out_file = os.path.abspath(os.path.join(out_path, new_name))
     #add file to meta
     agent.agent_meta['File'] = out_file
     # rewrite pickles
@@ -148,7 +148,7 @@ def split_tracks_spatiotemporal(time,
                 os.remove(pkl_file)
 
 def split_tracks_by_data(data_col,
-                         out_pth,
+                         out_path,
                          remove,
                          args):
     #split the args
@@ -161,7 +161,7 @@ def split_tracks_by_data(data_col,
     #now rewrite the pickles
     new_name = f'{agent.meta["Agent ID"]}.tracks'
     # out_file = pkl_files[0].replace(os.path.basename(pkl_file), new_name)
-    out_file = os.path.abspath(os.path.join(out_pth, new_name))
+    out_file = os.path.abspath(os.path.join(out_path, new_name))
     #add file to meta
     agent.agent_meta['File'] = out_file
     # rewrite pickles
@@ -176,7 +176,7 @@ def split_tracks_by_data(data_col,
 
 def split_tracks_kmeans(n_clusters, 
                         feature_cols, 
-                        out_pth,
+                        out_path,
                         return_error,
                         remove,
                         optimal_method,
@@ -199,7 +199,7 @@ def split_tracks_kmeans(n_clusters,
     #now rewrite the pickles
     new_name = f'{agent.meta["Agent ID"]}.tracks'
     # out_file = pkl_files[0].replace(os.path.basename(pkl_file), new_name)
-    out_file = os.path.abspath(os.path.join(out_pth, new_name))
+    out_file = os.path.abspath(os.path.join(out_path, new_name))
     #add file to meta
     agent.agent_meta['File'] = out_file
     # rewrite pickles
@@ -215,7 +215,7 @@ def split_tracks_kmeans(n_clusters,
         return error  
 
 def split_tracks_dbscan(feature_cols, 
-                        out_pth, 
+                        out_path, 
                         remove, 
                         eps, 
                         min_samples,
@@ -233,7 +233,7 @@ def split_tracks_dbscan(feature_cols,
                                       **kwargs)
     #now rewrite the pickles
     new_name = f'{agent.meta["Agent ID"]}.tracks'
-    out_file = os.path.abspath(os.path.join(out_pth, new_name))
+    out_file = os.path.abspath(os.path.join(out_path, new_name))
     #add file to meta
     agent.agent_meta['File'] = out_file
     # rewrite pickles
@@ -248,7 +248,7 @@ def split_tracks_dbscan(feature_cols,
 def clip_to_box(files, 
                 bbox, 
                 col_mapper=mappers.columns,
-                out_pth='.', 
+                out_path='.', 
                 ncores=1, 
                 pattern='_clipped'):
     """
@@ -260,7 +260,7 @@ def clip_to_box(files,
 
     Kwargs:
         col_mapper: Column mapping to use. Defaults to trackio.mappers.columns.
-        out_pth (str): Output path for clipped files. Defaults to '.'.
+        out_path (str): Output path for clipped files. Defaults to '.'.
         ncores (int): Number of cores to use for processing. Defaults to 1.
         pattern (str): Suffix pattern for clipped file names. Defaults to '_clipped'.
 
@@ -280,7 +280,7 @@ def clip_to_box(files,
         raise Exception('bbox must be shapely Polygon, box or list of (xmin, ymin, xmax, ymax)')
     clip_to_shape(files, 
                   bbox, 
-                  out_pth=out_pth, 
+                  out_path=out_path, 
                   ncores=ncores, 
                   poly=False, 
                   pattern=pattern,
@@ -289,7 +289,7 @@ def clip_to_box(files,
 def clip_to_polygon(files, 
                     poly, 
                     col_mapper=mappers.columns,
-                    out_pth='.', 
+                    out_path='.', 
                     ncores=1, 
                     pattern='_clipped'):
     """
@@ -301,7 +301,7 @@ def clip_to_polygon(files,
 
     Kwargs:
         col_mapper: Column mapping to use. Defaults to trackio.mappers.columns.
-        out_pth (str): Output path for clipped files. Defaults to '.'.
+        out_path (str): Output path for clipped files. Defaults to '.'.
         ncores (int): Number of cores to use for processing. Defaults to 1.
         pattern (str): Suffix pattern for clipped file names. Defaults to '_clipped'.
 
@@ -319,7 +319,7 @@ def clip_to_polygon(files,
     poly = (poly, edges)
     clip_to_shape(files, 
                   poly, 
-                  out_pth=out_pth, 
+                  out_path=out_path, 
                   ncores=ncores, 
                   poly=True, 
                   pattern=pattern,
@@ -327,7 +327,7 @@ def clip_to_polygon(files,
 
 def clip_to_shape(files, 
                   extent, 
-                  out_pth='.', 
+                  out_path='.', 
                   ncores=1, 
                   poly=True, 
                   col_mapper=mappers.columns,
@@ -342,7 +342,7 @@ def clip_to_shape(files,
         print(f'Raw file "{missed_file}" is not a csv, skipping...')
     out_files = []
     for raw_file in keep_files:
-        out_files.append(os.path.join(out_pth,
+        out_files.append(os.path.join(out_path,
                                       os.path.basename(raw_file).replace('.csv',f'{pattern}.csv')))
     clip_func = partial(_clip_to_shape, extent, poly, col_mapper)
     args = list(zip(out_files, files))
@@ -394,7 +394,7 @@ def follow_chain(start, connection_dict):
 
 def repair_tracks_spatiotemporal(time_threshold, 
                                  dist_threshold, 
-                                 out_pth,
+                                 out_path,
                                  pkl_file):
     #read the file
     agent = utils.read_pkl(pkl_file)
@@ -450,7 +450,7 @@ def repair_tracks_spatiotemporal(time_threshold,
         #overwrite the old tracks
         agent.tracks = new_tracks
         #overwrite the file
-        out_file = f'{out_pth}/{os.path.basename(pkl_file)}'
+        out_file = f'{out_path}/{os.path.basename(pkl_file)}'
         agent.agent_meta['File'] = out_file
         utils.save_pkl(out_file, agent)
     
@@ -479,7 +479,7 @@ def get_track_gaps(pkl_file):
             rows.append(row)
     return rows
 
-def remove_tracks(out_pth,
+def remove_tracks(out_path,
                   args):
     #separate the args
     pkl_file, tracks = args
@@ -496,7 +496,7 @@ def remove_tracks(out_pth,
         os.remove(pkl_file)
     #otherwise save the updated file
     else:
-        out_file = f'{out_pth}/{os.path.basename(pkl_file)}'
+        out_file = f'{out_path}/{os.path.basename(pkl_file)}'
         utils.save_pkl(out_file, agent)
         
 ################################################################################
