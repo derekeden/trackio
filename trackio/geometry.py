@@ -1,6 +1,9 @@
 ################################################################################
 
-from .utils import read_pkl, save_pkl, collect_agent_pkls, NN_idx2
+from .utils import (read_pkl, 
+                    save_pkl, 
+                    collect_agent_pkls, 
+                    NN_idx2)
 
 import numpy as np
 from pyproj import CRS, Geod
@@ -850,7 +853,7 @@ def proximity_to_object(shapes,
         min_dists = []
         for points2 in shapes:
             #if both 1 point
-            if len(points1)==1 and len(points2)==2:
+            if len(points1)==1 and len(points2)==1:
                 nearest_points = {'min_dist': ((points2-points1)**2).sum()**0.5,
                                   'p1': points1[0],
                                   'p2': points2[0],
@@ -1722,7 +1725,8 @@ def reduce_to_flow_map(characteristic_col,
     #loop over each track, route through polygons
     for tid in tids:
         track = agent.tracks[tid]
-        track = track[track[characteristic_col]].copy()
+        if characteristic_col is not None:
+            track = track[track[characteristic_col]].copy()
         track.loc[:,'X'] = track[flow_col].apply(lambda x: points.get(x)[0])
         track.loc[:,'Y'] = track[flow_col].apply(lambda x: points.get(x)[1])
         agent.tracks[tid] = track.reset_index(drop=True)

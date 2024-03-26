@@ -339,5 +339,3 @@ def classify_custom(values,
     save_pkl(pkl_files[0], agent)
 
 ################################################################################
-
-#port analysis from NOAA VIRUS project

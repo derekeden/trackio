@@ -21,6 +21,20 @@ class Agent:
                  id='agent',
                  meta={},
                  data=pd.DataFrame({c:[] for c in must_cols})):
+        """
+        Initializes an Agent instance with a unique identifier, metadata, and associated dynamic data.
+
+        The data kwarg must be a pandas DataFrame with AT MINIMUM [Time, X, Y] columns. The Time
+        column must be compatible with the pandas pd.to_dateime function.
+
+        Args:
+        id (str): The unique identifier for the agent. Defaults to 'agent'.
+        meta (dict): A dictionary containing metadata about the agent. This could include
+                               characteristics such as type, category, status, or any other descriptive
+                               information. Defaults to an empty dictionary.
+        data (pd.DataFrame): A pandas DataFrame consisting of, at minimum, [Time, X, Y] columns containing
+                            point data.
+        """
         #set data vars      
         self._data = data
         self.append_data = []
@@ -409,13 +423,6 @@ def gen_track_meta(tdf):
         "Xend": last['X'],
         "Yend": last['Y'],
         "Effective Distance": ((first['X'] - last['X']) ** 2 + (first['Y'] - last['Y']) ** 2) ** 0.5,
-        # "Draft": first['Draft'],
-        # "Min Speed": tdf['Speed'].min(),
-        # "Mean Speed": tdf['Speed'].mean(),
-        # "Max Speed": tdf['Speed'].max(),
-        # "Max Acceleration": tdf['Acceleration'].max(),
-        # "Max Decceleration": tdf['Acceleration'].min(),
-        # "Max Turning Rate": tdf['Turning Rate'].max(),
         "Min Temporal Resolution": np.nanmin(dts) if len(dts) > 0 else 0,
         "Mean Temporal Resolution": np.nanmean(dts) if len(dts) > 0 else 0,
         "Max Temporal Resolution": np.nanmax(dts) if len(dts) > 0 else 0,

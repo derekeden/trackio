@@ -251,6 +251,22 @@ def clip_to_box(files,
                 out_pth='.', 
                 ncores=1, 
                 pattern='_clipped'):
+    """
+    Clips data in a list of csv files to a user defined box, writes to clipped csv files.
+
+    Args:
+        files: List of file paths to clip
+        bbox: Bounding box (xmin, ymin, xmax, ymax) or shapely.geometry.Polygon/shapely.geometry.box
+
+    Kwargs:
+        col_mapper: Column mapping to use. Defaults to trackio.mappers.columns.
+        out_pth (str): Output path for clipped files. Defaults to '.'.
+        ncores (int): Number of cores to use for processing. Defaults to 1.
+        pattern (str): Suffix pattern for clipped file names. Defaults to '_clipped'.
+
+    Returns:
+        None
+    """
     if isinstance(bbox, (Polygon)):
         bbox = bbox.bounds
     elif len(bbox)==4 and isinstance(bbox, (tuple,list,np.ndarray)):
@@ -276,6 +292,22 @@ def clip_to_polygon(files,
                     out_pth='.', 
                     ncores=1, 
                     pattern='_clipped'):
+    """
+    Clips data in a list of csv files to a user defined polygon, writes to clipped csv files.
+
+    Args:
+        files: List of file paths to clip
+        poly: Geometry to clip the files against
+
+    Kwargs:
+        col_mapper: Column mapping to use. Defaults to trackio.mappers.columns.
+        out_pth (str): Output path for clipped files. Defaults to '.'.
+        ncores (int): Number of cores to use for processing. Defaults to 1.
+        pattern (str): Suffix pattern for clipped file names. Defaults to '_clipped'.
+
+    Returns:
+        None
+    """
     if isinstance(poly, Polygon):
         poly = np.array(poly.exterior.xy).T
         edges = [(i,i+1) for i in range(len(poly)-1)]

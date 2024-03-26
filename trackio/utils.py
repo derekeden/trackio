@@ -26,10 +26,22 @@ def append_pkl(out_file, pkl_obj):
         pkl.dump(pkl_obj, p)
 
 def read_pkl(pkl_file):
+    """
+    Reads a binary agent file.
+
+    Args:
+        pkl_file (str): Path to input agent file.
+    """
     with open(pkl_file, 'rb') as f:
         return pkl.load(f)
 
 def save_pkl(pkl_file, pkl_obj):
+    """
+    Writes object to a binary agent file.
+
+    Args:
+        pkl_file (str): Path to output agent file.
+    """
     with open(pkl_file, 'wb') as f:
         pkl.dump(pkl_obj, f)
 

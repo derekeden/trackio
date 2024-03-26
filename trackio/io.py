@@ -176,8 +176,33 @@ def to_df(code,
         dfs.append(track)
     return dfs
 
-def create_blank_raster(out_file, crs,
-                  grid={'x0':0, 'y0':0, 'nx':1, 'ny':1, 'dx':1, 'dy':1}):
+def create_blank_raster(out_file, 
+                        crs, 
+                        grid={'x0':0, 
+                              'y0':0,
+                              'nx':1,
+                              'ny':1, 
+                              'dx':1, 
+                              'dy':1}):
+    """
+    Creates a blank raster file with specified dimensions, resolution, and coordinate reference system (CRS).
+
+    Here, CRS can be a EPSG code, WKT string, proj4 string, pyproj.CRS object, etc.
+
+    This function generates an empty (blank) raster file, which can serve as a template for rasterizing tracks. 
+    
+    The raster dimensions, resolution, and spatial reference are defined by the user. The resulting raster will 
+    have all its pixel values set to 0 by default.
+
+    Args:
+        out_file (str): Path where the output raster file will be saved, must end in .tif.
+        crs: Coordinate reference system to be applied to the output raster. See description for options.
+        grid (dict): A dictionary defining the spatial extent (x0, y0), the number of pixels (nx, ny),
+                     and the resolution (dx, dy) of the raster.
+
+    Returns:
+        None
+    """
     assert out_file.lower().endswith('.tif'), 'out_file must be a .tif file'
     profile = {'count': 1,
                'crs': CRS(crs),
@@ -220,7 +245,33 @@ def create_blank_raster(out_file, crs,
 #     output = None
 #     print(f'Raster written to {out_file}')
 
-def rasterize(shp_file, ras_file, out_file, attribute=None):
+def rasterize(shp_file, 
+              ras_file, 
+              out_file, 
+              attribute=None):
+    """
+    Rasterizes a shapefile/gpkg/geojson onto an existing raster file saving the result to a new raster file.
+
+    If attribute is None, the resulting raster contains track counts that touch each pixel.
+
+    If attribute is not None, it must be one of the numeric columns in the attribute table of the input file.
+    In this case, the value of this column where the tracks/segments intersect each pixel will be summed. This
+    can be useful for creating maps of mean speed, time spent, etc.
+
+    This function uses gdal.Rasterize:
+
+    https://gdal.org/programs/gdal_rasterize.html
+
+    Args:
+        shp_file (str): Path to the input shapefile/gpkg/geojson containing the vector data to be rasterized.
+        ras_file (str): Path to the input raster file (.tif) that provides the template raster grid onto vector data is rasterized.
+        out_file (str): Path where the output raster file will be saved. This file contains the rasterized output.
+        attribute (str, optional): Name of the attribute field whose values will be used to burn into the raster. If not provided,
+                                   a fixed burn value of 1 is used for all features, resulting in track counts.
+
+    Returns:
+        None
+    """
     #make abspath
     out_file = os.path.abspath(out_file)
     ras_file = os.path.abspath(ras_file)
@@ -234,6 +285,7 @@ def rasterize(shp_file, ras_file, out_file, attribute=None):
     output.SetGeoTransform(geo_transform)
     output.SetProjection(ras.GetSpatialRef().ExportToWkt())
     output.GetRasterBand(1).SetNoDataValue(0)  
+    #rasterize
     if attribute is None:
         #rasterize counts
         gdal.Rasterize(output, 
@@ -250,6 +302,7 @@ def rasterize(shp_file, ras_file, out_file, attribute=None):
                                                      attribute=attribute,
                                                      allTouched=True))
         print(f'Track {attribute} written to {out_file}')
+    #flush the output
     output = None
     
 ################################################################################

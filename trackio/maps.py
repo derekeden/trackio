@@ -1,3 +1,5 @@
+################################################################################
+
 from .utils import (read_pkl, 
                     save_pkl, 
                     collect_agent_pkls, 
@@ -11,6 +13,8 @@ import numpy as np
 import multiprocessing as mp
 from tqdm import tqdm; GREEN = "\033[92m"; ENDC = "\033[0m" #for tqdm bar
 from functools import partial
+
+################################################################################
 
 #these are hardcoded
 code_mapper_file = f'{os.path.dirname(__file__)}/supporting/ais_code_mapper.csv'
@@ -60,6 +64,17 @@ class mappers:
         out['__file__'] = column_mapper_file
         return out
     def update(self, old, new):
+        """
+        Updates the mapper file stored on disk. Use this when you want to add or update an entry 
+        so it get's auto-detected next time.
+
+        Args:
+            old: Original dictionary mapper.
+            new: Updated dictionary mapper.
+            
+        Returns:
+            None
+        """
         #check if it can be updated
         msg = 'This mapper is not meant to be dynamically updated'
         assert '__file__' in old.keys(), msg
@@ -342,6 +357,17 @@ def _make_col_mapper(file):
     return pd.read_csv(file, nrows=0).columns.tolist()
 
 def make_col_mapper(files, ncores=1, fill_mapper={}):
+    """
+    Creates a dictionary mapper of all unique columns in a list of files.
+    
+    Args:
+        files: List/array of file paths to process.
+        ncores (int): Number of cores to use for processing. Defaults to 1.
+        fill_mapper (dict, optional): Dictionary for filling missing entries. Defaults to {}.
+
+    Returns:
+        dict: Mapping object of columns across provided files.    
+    """
     #get list of unique columns
     with mp.Pool(ncores) as pool:
         cols = pool.map(_make_col_mapper, 
@@ -365,14 +391,14 @@ def map_columns(chunk, col_mapper):
     chunk.columns = new_cols
     return chunk
 
-def _make_raw_data_mapper(data_col, col_mapper, file):
+def _make_raw_data_mapper(data_cols, col_mapper, file):
     #get the columns
     cols = pd.read_csv(file, nrows=0).columns.tolist()
     mapped_cols = [col_mapper.get(c, c) for c in cols]
     #see which columns/attributes exist and to read
     read_icols = []
     read_attrs = []
-    for attr in data_col:
+    for attr in data_cols:
         if attr in mapped_cols:
             read_icols.append(mapped_cols.index(attr))
             read_attrs.append(attr)
@@ -390,17 +416,29 @@ def _make_raw_data_mapper(data_col, col_mapper, file):
 
 def make_raw_data_mapper(files,
                          col_mapper=_mappers.columns,
-                         data_col=['Status','AISCode'],
+                         data_cols=[],
                          fill_mapper={},
                          ncores=4):
+    """
+    Creates a dictionary mapper of possible raw data values in a list of files, for a 
+    list of columns in the raw files.
+
+    Args:
+        files: List of file paths to process.
+        col_mapper (optional): Column mapping to use. Defaults to trackio.mappers.columns.
+        data_cols (list, optional): List of data columns to include. Defaults to [].
+        fill_mapper (dict, optional): Dictionary for filling missing entries. Defaults to {}.
+        ncores (int, optional): Number of cores to use for processing. Defaults to 4.
+
+    Returns:
+        dict: Raw data mapping dictionary.
+    """
     #if only one column
-    if isinstance(data_col, str):
-        fill_mapper = {data_col:fill_mapper}
-        data_col = [data_col]
+    assert len(data_cols)>0, 'Length of data_cols must be > 0'
     #get list of unique values for each attribute/column
     with mp.Pool(ncores) as pool:
         func = partial(_make_raw_data_mapper,
-                       data_col,
+                       data_cols,
                        col_mapper)
         _out = pool.map(func, 
                         tqdm(files, 
