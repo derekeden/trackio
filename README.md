@@ -82,7 +82,8 @@ Similarly, the `track.db` file contains the same information, but for each track
 
 ![TRACK](./trackio/supporting/readme_trackdb.png)
 
-These are essentially used as tables with metadata about the track data, which you to filter/query/operate on the track data much faster.
+These are essentially used as tables with metadata about the track data, which you to filter/query/operate on the track data much faster. A very lightweight, poor-man's version of SQL lookup tables.
+
 
 ## Functionality
 
