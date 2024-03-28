@@ -4,6 +4,18 @@
 
 ---
 
+## Table of Contents
+
+<!--ts-->
+   * [Overview](#overview)
+   * [Installation](#installation)
+   * [Overall Structure](#overall-structure)
+   * [Functionality](#functionality)
+   * [Documentation & Examples](#documentation)
+<!--te-->
+
+## Overview
+
 This is an open source library geared towards working with mass movement or track data.
 
 The library contains functionality to ingest, clean/repair, perform I/O conversions, process, analyze, and visualize mass movement data. 
@@ -36,15 +48,6 @@ As well, `trackio` is interoperable with Dask bags, so the sky is the limit in t
 `trackio` is largely based on Numpy, Pandas, GeoPandas, Dask, scikitlearn, GDAL, and Python's pickle module.
 
 ![LIBRARIES](./trackio/supporting/readme_libs.png)
-
-## Table of Contents
-
-<!--ts-->
-   * [Installation](#installation)
-   * [Overall Structure](#overall-structure)
-   * [Functionality](#functionality)
-   * [Examples](#examples)
-<!--te-->
 
 ## Installation
 
@@ -185,8 +188,12 @@ As track data is classified, the metadata tables are updated. This way you can u
 * Rasterized track attributes (e.g. time spent in pixel)
 * Representative unstructured graph
 
-## Examples
+## Documentation
 
 There are a series of Jupyter notebooks available in the [notebooks](https://github.com/derekeden/trackio/tree/main/notebooks) folder.
 
-The example notebooks showcase the full range of functionality for the library.
+The example notebooks showcase the full range of functionality for the library, as well as 3 specific
+example case studies.
+
+There are complete docstrings for public functions and classes. At this time, there are no docstrings
+for private/utility functions that are not exposed to the user.
