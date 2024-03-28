@@ -16,7 +16,7 @@
 
 This is an open source library geared towards working with mass movement or track data.
 
-The library contains functionality to ingest, clean/repair, perform I/O conversions, process, analyze, and visualize mass movement data. 
+The library contains functionality to ingest, clean/repair, perform I/O conversions, process, analyze, and visualize mass movement data. In addition, it provides a robust feature engineering framework for downstream AI/ML applications.
 
 Examples include data from vessels (AIS), planes (ADS), cars, animal migrations, Agent Based Modelling (ABM) output, hurricane paths, particles, etc. 
 Anything that contains movements stored in spatiotemporal (X, Y, Time) point format. 3D data is also supported, with Z stored as a dynamic data field.
