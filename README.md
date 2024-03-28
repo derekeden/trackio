@@ -2,6 +2,8 @@
 <img src="./trackio/supporting/logo3.png" alt="sidepanel" style="display: block; margin-right: auto;">
 </p>
 
+---
+
 ## Table of Contents
 
 <!--ts-->
