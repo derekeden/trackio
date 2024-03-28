@@ -80,7 +80,7 @@ In the `Dataset.data_path` folder, you will also find `dataset.db`, `agent.db`, 
 
 This is illustrated in the below figure:
 
-![STRUCTURE](./trackio/supporting/readme_structure1.png)
+![STRUCTURE](./trackio/supporting/readme_structure.png)
 
 The `dataset.db` file contains metadata about the actual `Dataset` in its entirety:
 
