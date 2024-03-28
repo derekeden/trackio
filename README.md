@@ -35,8 +35,8 @@ The library is able to natively ingest data in formats such as:
 
 It can be extended to any data format as long as you can get it into a valid native format with upstream custom code.
 
-Unlike other similar libraries, `trackio` was designed for memory-safe processing of arbitrarily sized heterogenous datasets on a modest machine.
-I.e., if you have a huge amount of data spread across hundreds of files with potentially different column names in ever file, and a modest machine 
+Unlike other similar libraries, `trackio` was designed for memory-safe processing of arbitrarily sized, heterogenous datasets on a modest machine.
+I.e., if you have a huge amount of data spread across hundreds of files with potentially different column names in every file, and a modest machine 
 with CPU/RAM limitations, this library will still work!
 
 `trackio` also has heavy operations coded in parallel to harness available computational power for faster analyses on large datasets. 
