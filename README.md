@@ -4,7 +4,7 @@
 
 ---
 
-This is an open source library geared towards working with mass movement / track data.
+This is an open source library geared towards working with mass movement or track data.
 
 The library contains functionality to ingest, clean/repair, perform I/O conversions, process, analyze, and visualize mass movement data. 
 
