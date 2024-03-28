@@ -7,7 +7,7 @@
 <!--ts-->
    * [Overview](#overview)
    * [Installation](#installation)
-   * [Overall Structure](#overall-structure)
+   * [Data Structures](#data-structures)
    * [Functionality](#functionality)
    * [Documentation & Examples](#documentation)
 <!--te-->
@@ -66,7 +66,7 @@ If using Anaconda/Miniconda, run this from the `trackio` folder:
 **Please note for the `inpoly` library, it requires Visual Studio C++ Dev Tools for Windows. If you don't have it already,**
 **the link will be in the error message, just follow the instructions to download then redo the trackio installation.**
 
-## Overall Structure
+## Data Structures
 
 The `trackio` library is structured so `Dataset` is the main class that you interface with. The `Dataset` class is a custom class that contains references to stored data, metadata about this data, and a series of attributes and methods that make it easy to operate on the data. 
 
