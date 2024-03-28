@@ -97,7 +97,7 @@ The `track.db` file contains similar information, but for each track in the `Dat
 Every agent and track is tagged with a unique identifier for record-keeping purposes and consistency
 throughout analyses.
 
-These tables are essentially used as a very lightweight, poor-man's version of SQL lookup tables.
+These tables are used as a very lightweight, poor-man's version of SQL lookup tables.
 
 ## Functionality
 
