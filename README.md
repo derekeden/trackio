@@ -102,7 +102,7 @@ These tables are used as a very lightweight, poor-man's version of SQL lookup ta
 
 ## Functionality
 
-The below provides a bullet list of the various functionality that is included in this library, for more information and detailed examples, please refer to [Examples](#examples):
+The below provides a bullet list of the various functionality that is included in this library, for more information and detailed examples, please refer to [Documentation & Examples](#documentation):
 
 ### [Data Ingestion](https://github.com/derekeden/trackio/blob/main/notebooks/03%20-%20Creating%20a%20Dataset%20from%20Raw%2C%20DataFrame%2C%20GeoDataFrame.ipynb)
 * From CSV and other pandas friendly ASCII files
