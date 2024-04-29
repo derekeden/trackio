@@ -269,6 +269,7 @@ class Dataset:
                      continued=False,
                      prefix='agent',
                      ncores=1,
+                     sep=',',
                      desc='Grouping points'):
         """
         Groups all points in Dataset based on groupby column(s) to isolate
@@ -291,6 +292,7 @@ class Dataset:
             continued (bool): Flag to indicate continuation of previous processing in Dataset.data_path. Defaults to False.
             prefix (str): Prefix for output files. Defaults to 'agent'.
             ncores (int): Number of cores to use for processing. Defaults to 1.
+            sep (str, optional): The separator of the csv file. Defaults to ','.
             desc (str): Description of the operation. Defaults to 'Grouping points'.
 
         Returns:
@@ -319,7 +321,8 @@ class Dataset:
                     meta_cols,
                     data_cols,
                     data_mappers,
-                    prefix)
+                    prefix,
+                    sep)
         #if any raw files
         if len(raw_files) > 0:
             #process in parallel

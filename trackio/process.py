@@ -19,25 +19,26 @@ from tqdm import tqdm; GREEN = "\033[92m"; ENDC = "\033[0m" #for tqdm bar
 
 must_cols = ['Time','X','Y']
 
-def group_points(groupby, 
-               chunksize,
-               out_path,
-               col_mapper,
-               meta_cols,
-               data_cols,
-               data_mappers, 
-               prefix,
-               raw_file):
-    #if it's a file
+def group_points(
+    groupby,
+    chunksize,
+    out_path,
+    col_mapper,
+    meta_cols,
+    data_cols,
+    data_mappers,
+    prefix,
+    sep,
+    raw_file,
+):
+    # if it's a file
     if isinstance(raw_file, str):
         if (not raw_file.lower().endswith('.csv')):
             print(f'Raw file "{raw_file}" is not a csv, skipping...')
             return
         # get the reader, if csv then chunk for big ones, feather can't be chunked
-        reader = pd.read_csv(raw_file, 
-                             chunksize=chunksize, 
-                             on_bad_lines='warn')
-        #split raw ais pings to pkls by groupby
+        reader = pd.read_csv(raw_file, chunksize=chunksize, on_bad_lines="warn", sep=sep)
+        # split raw ais pings to pkls by groupby
         for chunk in reader:
             _group_points(chunk, 
                           groupby,
@@ -291,6 +292,7 @@ def clip_to_polygon(files,
                     col_mapper=mappers.columns,
                     out_path='.', 
                     ncores=1, 
+                    sep=',',
                     pattern='_clipped'):
     """
     Clips data in a list of csv files to a user defined polygon, writes to clipped csv files.
@@ -303,6 +305,7 @@ def clip_to_polygon(files,
         col_mapper: Column mapping to use. Defaults to trackio.mappers.columns.
         out_path (str): Output path for clipped files. Defaults to '.'.
         ncores (int): Number of cores to use for processing. Defaults to 1.
+        sep (str, optional): The separator of the csv file. Defaults to ','.
         pattern (str): Suffix pattern for clipped file names. Defaults to '_clipped'.
 
     Returns:
@@ -323,7 +326,8 @@ def clip_to_polygon(files,
                   ncores=ncores, 
                   poly=True, 
                   pattern=pattern,
-                  col_mapper=col_mapper)
+                  col_mapper=col_mapper,
+                  sep=sep)
 
 def clip_to_shape(files, 
                   extent, 
@@ -331,6 +335,7 @@ def clip_to_shape(files,
                   ncores=1, 
                   poly=True, 
                   col_mapper=mappers.columns,
+                  sep=',',
                   pattern='_clipped'):   
     if ncores > len(files):
         ncores = len(files)
@@ -342,9 +347,8 @@ def clip_to_shape(files,
         print(f'Raw file "{missed_file}" is not a csv, skipping...')
     out_files = []
     for raw_file in keep_files:
-        out_files.append(os.path.join(out_path,
-                                      os.path.basename(raw_file).replace('.csv',f'{pattern}.csv')))
-    clip_func = partial(_clip_to_shape, extent, poly, col_mapper)
+        out_files.append(os.path.join(out_path, os.path.basename(raw_file).replace(".csv", f"{pattern}.csv")))
+    clip_func = partial(_clip_to_shape, extent, poly, col_mapper, sep)
     args = list(zip(out_files, files))
     with mp.Pool(ncores) as pool:
         args = list(zip(out_files, files))
@@ -353,19 +357,15 @@ def clip_to_shape(files,
                                      desc=GREEN+'Clipping raw data'+ENDC, 
                                      colour='GREEN'))
 
-def _clip_to_shape(extent, 
-                   poly, 
-                   col_mapper,
-                   out_file, 
-                   raw_file):
-    print('Clipping', raw_file)
-    cols = pd.read_csv(raw_file, nrows=0)
-    #get standard cols and navstats
+def _clip_to_shape(extent, poly, col_mapper, sep, out_file, raw_file):
+    print("Clipping", raw_file)
+    cols = pd.read_csv(raw_file, nrows=0, sep=sep)
+    # get standard cols and navstats
     new_cols = []
     for col in cols:
         new_cols.append(col_mapper.get(col, col))
-    #read the data
-    dat = pd.read_csv(raw_file, on_bad_lines='warn')
+    # read the data
+    dat = pd.read_csv(raw_file, on_bad_lines="warn", sep=sep)
     if len(dat) == 0:
         return
     else:

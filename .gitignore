@@ -1,6 +1,8 @@
+__pycache__/
 DEV/*
 trackio/supporting/*.pdf
 trackio/supporting/*.pptx
+trackio.egg-info/
 *.gpkg
 *.gpkg
 trackio/tools/stats.py

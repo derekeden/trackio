@@ -353,33 +353,35 @@ def make_data_mapper(inp, args):
         out[i] = np.unique(out[i]).tolist()
     return out
 
-def _make_col_mapper(file):
-    return pd.read_csv(file, nrows=0).columns.tolist()
 
-def make_col_mapper(files, ncores=1, fill_mapper={}):
+def _make_col_mapper(file: str, sep: str):
+    return pd.read_csv(file, nrows=0, sep=sep).columns.tolist()
+
+
+def make_col_mapper(files: list[str], ncores: int = 1, fill_mapper: dict = {}, sep: str = ",") -> dict:
     """
     Creates a dictionary mapper of all unique columns in a list of files.
-    
+
     Args:
-        files: List/array of file paths to process.
+        files(list[str]): List/array of file paths to process.
         ncores (int): Number of cores to use for processing. Defaults to 1.
+        sep (str, optional): The separator of the csv file. Defaults to ','.
         fill_mapper (dict, optional): Dictionary for filling missing entries. Defaults to {}.
 
     Returns:
-        dict: Mapping object of columns across provided files.    
+        dict: Mapping object of columns across provided files.
     """
-    #get list of unique columns
+    # get list of unique columns
     with mp.Pool(ncores) as pool:
-        cols = pool.map(_make_col_mapper, 
-                        tqdm(files, 
-                             total=len(files), 
-                             desc=GREEN+'Making column mapper'+ENDC,
-                             colour='GREEN'))
-    #flatten and get unique only
+        func = partial(_make_col_mapper, sep=sep)
+        cols = pool.map(
+            func, tqdm(files, total=len(files), desc=GREEN + "Making column mapper" + ENDC, colour="GREEN")
+        )
+    # flatten and get unique only
     cols = np.unique(flatten(cols))
-    #match standard columns
+    # match standard columns
     vals = list(map(lambda x: fill_mapper.get(x, x), cols))
-    #return mapper
+    # return mapper
     return dict(zip(cols, vals))
 
 def map_columns(chunk, col_mapper):
@@ -391,9 +393,10 @@ def map_columns(chunk, col_mapper):
     chunk.columns = new_cols
     return chunk
 
-def _make_raw_data_mapper(data_cols, col_mapper, file):
-    #get the columns
-    cols = pd.read_csv(file, nrows=0).columns.tolist()
+
+def _make_raw_data_mapper(data_cols, col_mapper, sep, file):
+    # get the columns
+    cols = pd.read_csv(file, nrows=0, sep=sep).columns.tolist()
     mapped_cols = [col_mapper.get(c, c) for c in cols]
     #see which columns/attributes exist and to read
     read_icols = []
@@ -404,8 +407,7 @@ def _make_raw_data_mapper(data_cols, col_mapper, file):
             read_attrs.append(attr)
     #read the file only once
     usecols = [cols[i] for i in read_icols]
-    df = pd.read_csv(file, 
-                     usecols=usecols)[usecols] #to reorder them
+    df = pd.read_csv(file, usecols=usecols, sep=sep)[usecols]  # to reorder them
     df.columns = read_attrs
     #format to unique dict
     out = {}
@@ -414,11 +416,8 @@ def _make_raw_data_mapper(data_cols, col_mapper, file):
     #return
     return out
 
-def make_raw_data_mapper(files,
-                         col_mapper=_mappers.columns,
-                         data_cols=[],
-                         fill_mapper={},
-                         ncores=4):
+
+def make_raw_data_mapper(files, col_mapper=_mappers.columns, data_cols=[], fill_mapper={}, ncores=4, sep=","):
     """
     Creates a dictionary mapper of possible raw data values in a list of files, for a 
     list of columns in the raw files.
@@ -427,6 +426,7 @@ def make_raw_data_mapper(files,
         files: List of file paths to process.
         col_mapper (optional): Column mapping to use. Defaults to trackio.mappers.columns.
         data_cols (list, optional): List of data columns to include. Defaults to [].
+        sep (str, optional): The separator of the csv file. Defaults to ','.
         fill_mapper (dict, optional): Dictionary for filling missing entries. Defaults to {}.
         ncores (int, optional): Number of cores to use for processing. Defaults to 4.
 
@@ -437,15 +437,9 @@ def make_raw_data_mapper(files,
     assert len(data_cols)>0, 'Length of data_cols must be > 0'
     #get list of unique values for each attribute/column
     with mp.Pool(ncores) as pool:
-        func = partial(_make_raw_data_mapper,
-                       data_cols,
-                       col_mapper)
-        _out = pool.map(func, 
-                        tqdm(files, 
-                             total=len(files), 
-                             desc=GREEN+'QCing data columns'+ENDC,
-                             colour='GREEN'))
-    #reformat into key:list dict
+        func = partial(_make_raw_data_mapper, data_cols, col_mapper, sep)
+        _out = pool.map(func, tqdm(files, total=len(files), desc=GREEN + "QCing data columns" + ENDC, colour="GREEN"))
+    # reformat into key:list dict
     out = flatten_dict_unique(_out)
     #convert list to raw:mapped dict
     for key in out.keys():
