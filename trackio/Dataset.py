@@ -24,7 +24,8 @@ from shapely.geometry import (box,
                               LineString, 
                               MultiLineString, 
                               Polygon, 
-                              MultiPolygon)
+                              MultiPolygon,
+                              Point)
 import rasterio as rio
 import dask.bag as db
 from inpoly import inpoly2
@@ -454,6 +455,7 @@ class Dataset:
         out_path = self._set_out_path(out_path)
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
+
         #process tracks in parallel
         utils.pool_caller(process.split_tracks_by_data,
                           (data_col, out_path, remove),
@@ -3412,6 +3414,7 @@ class Dataset:
         meta = 'Inside Polygon'
         self.meta[f'Code{code}'] = meta
         return self
+
     
     def classify_in_polygons(self,
                             polygons,
@@ -3472,6 +3475,44 @@ class Dataset:
         meta='Inside Polygon'
         for code in polygons['Code'].values:
             self.meta[f'Code{code}'] = meta
+        return self
+    
+    def classify_toward_point(self: 'Dataset',
+                            point: Point,
+                            agents: list | None = None,
+                            tracks: list | None = None, 
+                            ncores: int =1, 
+                            code: int =16,
+                            desc: str ='Classifying tracks toward point'):
+        """
+        Classifies tracks True if they head towards a given point, and False if they do not. This classification is stored in a boolean column in the track data.
+
+        Args:
+            point (Point): The Point must be a shapely Point.
+            agents (list, optional): A list of agent IDs to be included in the classification. If None, the classification
+                                    will consider all agents in the dataset.
+            tracks (list, optional): A list of specific track IDs to be classified. This allows for selective analysis
+                                    of certain tracks. If None, the operation applies to tracks related to the specified
+                                    agents or all tracks if no agents are specified.
+            ncores (int, optional): The number of processing cores to use for the classification operation. Defaults to 1.
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=16, then 
+                                 the output column is Code16. Defaults to 16. Do not use 0.
+            desc (str, optional): A brief description of the operation. Defaults to 'Classifying tracks toward point'.
+
+        Returns:
+            self: The Dataset instance.
+        """
+        #get the files to process
+        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
+        #resample in parallel
+        utils.pool_caller(classify.classify_toward_point,
+                          (point, code),
+                          pkl_groups,
+                          desc,
+                          ncores)
+        #update meta
+        meta = 'Toward Point'
+        self.meta[f'Code{code}'] = meta
         return self
     
     def classify_speed(self, 
@@ -3588,7 +3629,7 @@ class Dataset:
                                   tracks=None, 
                                   ncores=1, 
                                   code=19,
-                                  desc='Classifying tracks by speed threshold in polygon'):
+                                  desc='Classifying tracks by speed threshold in polygon') -> "Dataset":
         """
         This is simply a combination of Dataset.classify_in_polygon and Dataset.classify_speed.
         This classifies points on tracks if they meet or don't meet a speed threshold inside of a given polygon.
@@ -3598,10 +3639,8 @@ class Dataset:
         Args:
             polygon: The polygon must be a shapely Polygon, or a Nx2 array representing the outline of a polygon.
             speed (float): The speed threshold used for classification.
-            higher (bool, optional): If True, tracks or agents with speeds higher than the specified threshold will
-                                    be classified. Defaults to True.
-            lower (bool, optional): If True, tracks or agents with speeds lower than the specified threshold will
-                                    be classified. Defaults to False.
+            higher (bool, optional): If True, tracks or agents with speeds higher or equal than the specified threshold will
+                                    be classified. Otherwise lower (or equal) speeds will be classified. Defaults to True.
             agents (list, optional): A list of agent IDs to be included in the speed classification. If None,
                                     the classification considers all agents in the dataset.
             tracks (list, optional): A list of specific track IDs to be classified by speed. This allows for selective
@@ -3615,17 +3654,10 @@ class Dataset:
                                 which can be customized for more specific descriptions or contexts of the classification.
 
         Returns:
-            self: The Dataset instance.
+            Dataset: The Dataset instance.
         """
         #get polygon
         polygon, edges = utils.format_polygon(polygon)
-        #check for bounds
-        if lower:
-            higher = False
-        elif higher:
-            lower = False
-        else:
-            raise Exception('Must pass higher=True or lower=True, but not both')
         #get the files to process
         pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
         #process in parallel

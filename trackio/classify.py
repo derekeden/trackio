@@ -3,6 +3,7 @@
 from .utils import save_pkl, collect_agent_pkls, first_nonzero
 
 from shapely import geometry
+from shapely.geometry import Point
 from inpoly import inpoly2
 import numpy as np
 from more_itertools import consecutive_groups
@@ -79,6 +80,38 @@ def classify_in_polygons(polys,
     #save the file
     save_pkl(pkl_files[0], agent)
 
+def classify_toward_point(point: Point, 
+                        code: int, 
+                        args: tuple):
+    #split args
+    pkl_files, tracks = args
+
+    #read split agent file
+    agent = collect_agent_pkls(pkl_files)
+    #reduce to tracks of interest
+    if len(tracks) > 0:
+        tids = [tid for tid in agent.tracks.keys() 
+                if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks]
+    else:
+        tids = agent.tracks.keys()
+    #loop over each track
+
+    for tid in tids:
+        track = agent.tracks[tid]
+        start_coordinate = geometry.Point(track["X"].iloc[0], track["Y"].iloc[0])
+        stop_coordinate = geometry.Point(track["X"].iloc[-1], track["Y"].iloc[-1])
+        distance_start = start_coordinate.distance(point)
+        distance_stop = stop_coordinate.distance(point)
+        if distance_start > distance_stop:
+            result = True
+        else:
+            result = False
+
+        track.loc[:,f'Code{code}'] = result
+    
+    #save the file
+    save_pkl(pkl_files[0], agent)
+
 def classify_speed(speed, 
                    higher, 
                    code, 
@@ -133,24 +166,49 @@ def classify_turns(rate,
     save_pkl(pkl_files[0], agent)
     return
     
-def _classify_speed_inpoly(x, y, speeds, poly, edges,
-                           speed=4, method='higher'):
-    isin = inpoly2(np.column_stack((x, y)), poly, edges, ftol=1e-8)
-    if method == 'higher':
-        return np.logical_or(*isin) & (speeds >= speed)
-    else:
-        return np.logical_or(*isin) & (speeds <= speed)
+def _classify_speed_inpoly(x: np.ndarray[float], 
+                           y: np.ndarray[float], 
+                           speeds: np.ndarray[float], 
+                           poly: np.ndarray, 
+                           edges: tuple,
+                           speed: float, 
+                           higher: bool) -> np.ndarray[bool]:
+    """Classify if datapoints lie within a given polygon and its speed is higher or lower than a certain velocity.
 
-def classify_speed_in_polygon(speed, 
-                              poly, 
-                              edges, 
-                              higher, 
-                              code, 
-                              args):
+    Args:
+        x (np.ndarray[float]): X-coordinates of the datapoints.
+        y (np.ndarray[float]): Y-coordinates of the datapoints.
+        speeds (np.ndarray[float]): The speeds pf the datapoints
+        poly (np.ndarray): The polygon coordinates by which to classify.
+        edges (tuple): The edges of the polygon.
+        speed (float):  The speed by which to classify.
+        higher (bool): If True, speed of datapoint needs to be higher than the input speed.
+
+    Returns:
+        np.ndarray[bool]: Boolean array with true if classification query is correct and false if not.
+    """
+    isin = inpoly2(np.column_stack((x, y)), poly, edges, ftol=1e-8)
     if higher:
-        method = 'higher'
+        return np.logical_and(np.logical_or(*isin), (speeds >= speed))
     else:
-        method = 'lower'
+        return np.logical_and(np.logical_or(*isin), (speeds <= speed))
+
+def classify_speed_in_polygon(speed: float, 
+                              poly: np.ndarray, 
+                              edges: tuple, 
+                              higher: bool, 
+                              code: int, 
+                              args: list):
+    """Classify if datapoints lie within a given polygon and its speed is higher or lower than a certain velocity.
+
+    Args:
+        speed (float): The speed by which to classify.
+        poly (np.ndarray): The polygon coordinates by which to classify.
+        edges (tuple): The edges of the polygon.
+        higher (bool): If True, speed of datapoint needs to be higher than the input speed.
+        code (int): The numer of the code column to which the classification bool will be written.
+        args (list): Essentially the binary file names and track list if specified.
+    """
     #split args
     pkl_files, tracks = args
     #read split agent file
@@ -165,15 +223,15 @@ def classify_speed_in_polygon(speed,
     for tid in tids:
         track = agent.tracks[tid]
         #classify points
-        speed = track['Speed'].values
+        speeds = track['Speed'].values
         x, y = track['X'].values, track['Y'].values
         result = _classify_speed_inpoly(x,
                                         y,
-                                        speed,
+                                        speeds,
                                         poly,
                                         edges,
                                         speed,
-                                        method)
+                                        higher)
         track.loc[:,f'Code{code}'] = result
     #save the file
     save_pkl(pkl_files[0], agent)
