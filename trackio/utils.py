@@ -18,6 +18,8 @@ import pandas as pd
 import shapely
 import geopandas as gp
 
+from .Agent import Agent
+
 ################################################################################
 
 def append_pkl(out_file, pkl_obj):
@@ -45,7 +47,7 @@ def save_pkl(pkl_file, pkl_obj):
     with open(pkl_file, 'wb') as f:
         pkl.dump(pkl_obj, f)
 
-def collect_agent_pkls(pkl_files):
+def collect_agent_pkls(pkl_files) -> Agent:
     #loop over pkl files
     i = 0
     for pkl_file in pkl_files:

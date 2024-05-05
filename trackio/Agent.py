@@ -151,7 +151,8 @@ class Agent:
                              tracks=[]):
         #if only specific tracks
         if len(tracks) > 0:
-            old_track_ids = [f"{self.meta['Agent ID']}_T{i}" for i in range(len(self.tracks))]
+            # old_track_ids = [f"{self.meta['Agent ID']}_T{i}" for i in range(len(self.tracks))]
+            old_track_ids = [f"{self.meta['Agent ID']}_{tid}" for tid in self.tracks.keys()]
             keep_track_ids = [tid.rsplit('_', 1)[1] for tid in old_track_ids if tid not in tracks]
             keep_tracks = [self.tracks[idx] for idx in keep_track_ids]
             for tid in keep_track_ids:
