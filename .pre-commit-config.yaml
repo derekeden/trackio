@@ -18,4 +18,6 @@ repos:
       rev: 7.0.0
       hooks:
       -   id: flake8
-          args: ["--ignore=E501,E203,W503,E722"]
+          args: 
+            - "--ignore=E501,E203,W503,E722"
+            - "--per-file-ignore=*/__init__.py:F401"
