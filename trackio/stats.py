@@ -19,7 +19,7 @@
 #     beams = pd.concat([beams,_beams])
 #     stats = beams.groupby('Type')['Width'].agg(list).apply(lambda x: pd.Series(x).describe())
 #     return stats
-   #
+#
 # def vessel_length_stats(dataset, agents=None):
 #     if agents is None:
 #         agents = dataset.agents
@@ -78,7 +78,7 @@
 #     _ds['Type'] = 'All'
 #     ds = pd.concat([ds,_ds])
 #     stats = ds.groupby('Type')['Duration'].agg(list).apply(lambda x: pd.Series(x).describe())
-#     return stats 
+#     return stats
 
 # def npings_per_vessel_stats(dataset, agents=None):
 #     if agents is None:
@@ -254,7 +254,7 @@
 #     beams = pd.concat([beams,_beams])
 #     grouped = beams.groupby('Type')['Width'].agg(list)
 #     x = grouped.apply(lambda x: np.histogram(x, bins=bins, density=False))
-#     out = pd.DataFrame({'Type':x.index, 
+#     out = pd.DataFrame({'Type':x.index,
 #                         'PDF':x.apply(lambda x: x[0]),
 #                         'Edges':x.apply(lambda x: x[1])})
 #     if density:
@@ -273,7 +273,7 @@
 #     loas = pd.concat([loas,_loas])
 #     grouped = loas.groupby('Type')['Length'].agg(list)
 #     x = grouped.apply(lambda x: np.histogram(x, bins=bins, density=False))
-#     out = pd.DataFrame({'Type':x.index, 
+#     out = pd.DataFrame({'Type':x.index,
 #                         'PDF':x.apply(lambda x: x[0]),
 #                         'Edges':x.apply(lambda x: x[1])})
 #     if density:
@@ -282,7 +282,7 @@
 #     else:
 #         pass
 #     return out
-        
+
 # def track_length_dist(dataset, bins=10, density=True):
 #     ls = dataset.tracks[['Type','Track Length']]
 #     # ls = ls[ls['Track Length'] > 0]
@@ -292,7 +292,7 @@
 #     ls = pd.concat([ls,_ls])
 #     grouped = ls.groupby('Type')['Track Length'].agg(list)
 #     x = grouped.apply(lambda x: np.histogram(x, bins=bins, density=False))
-#     out = pd.DataFrame({'Type':x.index, 
+#     out = pd.DataFrame({'Type':x.index,
 #                         'PDF':x.apply(lambda x: x[0]),
 #                         'Edges':x.apply(lambda x: x[1])})
 #     if density:
@@ -300,7 +300,7 @@
 #         out['PDF'] = out['PDF'].apply(lambda x: [y/tot for y in x])
 #     else:
 #         pass
-#     return out  
+#     return out
 
 # def track_duration_dist(dataset, bins=10, density=True):
 #     ds = dataset.tracks[['Type','Duration']]
@@ -311,7 +311,7 @@
 #     ds = pd.concat([ds,_ds])
 #     grouped = ds.groupby('Type')['Duration'].agg(list)
 #     x = grouped.apply(lambda x: np.histogram(x, bins=bins, density=False))
-#     out = pd.DataFrame({'Type':x.index, 
+#     out = pd.DataFrame({'Type':x.index,
 #                         'PDF':x.apply(lambda x: x[0]),
 #                         'Edges':x.apply(lambda x: x[1])})
 #     if density:
@@ -319,6 +319,6 @@
 #         out['PDF'] = out['PDF'].apply(lambda x: [y/tot for y in x])
 #     else:
 #         pass
-#     return out  
+#     return out
 
 # ################################################################################
