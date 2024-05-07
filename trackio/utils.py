@@ -8,6 +8,8 @@ import geopandas as gp
 import numpy as np
 import pandas as pd
 import shapely
+from geopandas import GeoDataFrame, points_from_xy
+from pandas import DataFrame
 from pyproj import CRS
 from scipy.spatial import Voronoi
 from shapely.geometry import (
@@ -221,6 +223,25 @@ def gdf_to_df(gdf):
             row["Y"] = y
             rows.append(row)
     return pd.DataFrame(rows)
+
+
+def df_to_gdf(
+    df: DataFrame, x_dimension: str, y_dimension: str, crs: str
+) -> GeoDataFrame:
+    """Converts a DataFrame to a GeoDataFrame. The "geometry" column is appended after the last column.
+
+    Args:
+        df (DataFrame): Pandas DataFrame.
+        x_dimension (str): Name of the x-coordinate column in the DataFrame.
+        y_dimension (str): Name of the y-coordinate column in the DataFrame.
+        crs (str): Coordinate reference system.
+
+    Returns:
+        GeoDataFrame: Georeferenced DataFrame.
+    """
+    return GeoDataFrame(
+        df, geometry=points_from_xy(df[x_dimension], df[y_dimension]), crs=crs
+    )
 
 
 def longitudinal_slices(start, end, n_slices, spacing, dist):
