@@ -2129,6 +2129,71 @@ class Dataset:
         self = self._update_meta(out_path, meta)
         return self
 
+    def compute_timestep(
+        self,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        method="backward",
+        desc="Computing timestep size",
+    ) -> "Dataset":
+        """
+        Computes the timestep size based on the timestamp of consequtive points in a track. This gets added
+        as an "Timestep" column in the track data.
+
+        The method kwarg must be one of ['forward', 'backward'] and corresponds to which pairs of
+        points to use for calculating timestep values, and how to fill the remaining point.
+
+        If 'forward', the timestep size at each point is calculated by comparing its timestamp to the next point.
+        The first point on the track then gets filled a np.nan value.
+
+        If 'backward', it uses the current point and the previous point, and the last point gets filled with
+        np.nan.
+
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
+        in the original self.data_path location.
+
+        Args:
+            agents (list, optional): A list of agent IDs for which the timestep will be computed. If None, the timestep
+                                    will be computed for all agents available in the dataset.
+            tracks (list, optional): A list of specific track IDs for which to compute the timestep. This allows
+                                    focusing on particular tracks of interest. If None, and agents are specified,
+                                    the timestep is computed for all tracks associated with the specified agents.
+                                    If both are None, the timestep is computed for all tracks in the dataset.
+            ncores (int, optional): The number of processing cores to use for the computation. Defaults to 1.
+            out_path (str, optional): The file path where the results of the timestep computation should be saved.
+                                    If None, it uses the current data_path.
+            method (str, optional): The method used to compute the timestep, must be one of ['forward', 'backward']. Defaults to 'backward'.
+            desc (str, optional): A brief description of the timestep computation operation. Defaults to 'Computing timestep'.
+
+        Returns:
+            self: The Dataset instance.
+        """
+        # assert method
+        msg = "method must be backward, or forward"
+        assert method in ["backward", "forward"], msg
+        # set out path
+        out_path = self._set_out_path(out_path)
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # recompute in parallel
+        utils.pool_caller(
+            geometry.compute_timestep,
+            (out_path, method),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
+        meta = self.meta.copy()
+        meta["Timestep"] = "second"
+        self = self._update_meta(out_path, meta)
+        return self
+
     def compute_distance_travelled(
         self,
         relative=False,

@@ -558,6 +558,37 @@ def compute_acceleration(out_path, method, args):
     save_pkl(out_file, agent)
 
 
+def compute_timestep(out_path: str, method: str, args: tuple):
+    # split args
+    pkl_files, tracks = args
+    # read split agent file
+    agent = collect_agent_pkls(pkl_files)
+    # reduce to tracks of interest
+    if len(tracks) > 0:
+        tids = [
+            tid
+            for tid in agent.tracks.keys()
+            if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks
+        ]
+    else:
+        tids = agent.tracks.keys()
+    # loop over each track, recompute timestep
+    for tid in tids:
+        track = agent.tracks[tid]
+        if len(track) == 1:
+            dt = [np.nan]
+        else:
+            dt = np.diff(track["Time"].values) / np.timedelta64(1, "s")
+            if method == "forward":
+                dt = np.hstack([dt, np.nan])
+            elif method == "backward":
+                dt = np.hstack([np.nan, dt])
+        track.loc[:, "Timestep"] = dt
+    # save the agent back
+    out_file = f"{out_path}/{os.path.basename(pkl_files[0])}"
+    save_pkl(out_file, agent)
+
+
 def compute_distance_travelled(out_path, relative, args):
     # split args
     pkl_files, tracks = args
