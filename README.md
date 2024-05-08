@@ -10,6 +10,7 @@
    * [Data Structures](#data-structures)
    * [Functionality](#functionality)
    * [Documentation & Examples](#documentation)
+   * [Developers](#developers)
 <!--te-->
 
 ## Overview
@@ -194,4 +195,20 @@ The example notebooks showcase the full range of functionality for the library, 
 example case studies.
 
 There are complete docstrings for public functions and classes. At this time, there are no docstrings
-for private/utility functions that are not exposed to the user.
+for private/utility functions that are not exposed to the user. This is underway.
+
+## Developers
+
+Currently, this repository is utilizing pre-commit functionality to maintain formatting and style standards in the code.
+
+To contribute to the repository, please install the `pre-commit` library so the existing pre-commit hooks automatically run.
+
+From the root `trackio` folder, run:
+
+`pip install pre-commit` 
+
+`pre-commit install`
+
+This will install the hooks and make sure they run automatically everytime you make a commit.
+
+As the developer community grows, GitHub actions will be added to enforce this functionality.
