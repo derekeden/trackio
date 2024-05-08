@@ -107,7 +107,7 @@
 #                 'Length':length,
 #                 'Width':width}
 #         return out
-        
+
 # # def vesselfinder_meta(mmsi=None, imo=None, name=None):
 # #     #set urls
 # #     search_url = "https://www.vesselfinder.com/vessels?name="
@@ -154,7 +154,7 @@
 # #         psoup = bs(page.text, features="html.parser")
 # #         #try to find table
 # #         try:
-# #             table = psoup.find('h2', text='Vessel Particulars').parent.find_all('tr') 
+# #             table = psoup.find('h2', text='Vessel Particulars').parent.find_all('tr')
 # #         except AttributeError:
 # #             return empty_info()
 # #         #format table
@@ -198,7 +198,7 @@
 # #                'Length':length,
 # #                'Width':width}
 # #         return out
-            
+
 # # def marinetraffic_meta(mmsi=None, imo=None, name=None):
 # #     #set urls
 # #     search_url = "https://www.marinetraffic.com/en/global_search/search?term="
@@ -296,8 +296,8 @@
 # #         #first check if mmsi is available for search
 # #         if isinstance(row['mmsi'], str) or isinstance(row['mmsi'], int):
 # #             #loop over fetchers
-# #             for fetcher in (marinetraffic_meta, 
-# #                             vesselfinder_meta, 
+# #             for fetcher in (marinetraffic_meta,
+# #                             vesselfinder_meta,
 # #                             myshiptracking_meta):
 # #                 res = fetcher(mmsi=row['mmsi'])
 # #                 #if empty, pass so it goes to next fetcher
@@ -314,8 +314,8 @@
 # #         #second check for name to search
 # #         if isinstance(row['name'], str):
 # #             #loop over fetchers
-# #             for fetcher in (marinetraffic_meta, 
-# #                             vesselfinder_meta, 
+# #             for fetcher in (marinetraffic_meta,
+# #                             vesselfinder_meta,
 # #                             myshiptracking_meta):
 # #                 res = fetcher(name=row['name'])
 # #                 #if empty, pass so it goes to next fetcher
@@ -332,8 +332,8 @@
 # #         #third check if imo to search
 # #         if isinstance(row['imo'], str) or isinstance(row['imo'], int):
 # #             #loop over fetchers
-# #             for fetcher in (marinetraffic_meta, 
-# #                             vesselfinder_meta, 
+# #             for fetcher in (marinetraffic_meta,
+# #                             vesselfinder_meta,
 # #                             myshiptracking_meta):
 # #                 res = fetcher(imo=row['imo'])
 # #                 #if empty, pass so it goes to next fetcher
@@ -358,7 +358,7 @@
 # #     out['Width_original'] = search['width'].values
 # #     out.index = search.index
 # #     return out
-        
+
 # ################################################################################
 
 
@@ -376,7 +376,7 @@
 # # mask6 = vdb['Width'] <= 0 #abnormal width
 
 # # #get the chunk of the vessel database, only need 6 columns for this
-# # keep_cols = ['Name','MMSI','IMO', 
+# # keep_cols = ['Name','MMSI','IMO',
 # #              'Type', 'Length', 'Width']
 # # search = vdb[(mask1|mask2|mask3|mask4|mask5|mask6)][keep_cols]
 

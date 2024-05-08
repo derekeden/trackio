@@ -1,35 +1,32 @@
 ################################################################################
 
-from . import (utils, 
-               process, 
-               geometry, 
-               classify, 
-               io,
-               maps)
-
-from .Agent import (gen_track_meta, 
-                    gen_agent_meta)
-
-from copy import deepcopy
-import re
-import pyproj
-import geopandas as gp
 import glob
 import multiprocessing as mp
-import numpy as np
 import os
-import pandas as pd
-from pyproj import CRS, Transformer
-from shapely.geometry import (box, 
-                              LineString, 
-                              MultiLineString, 
-                              Polygon, 
-                              MultiPolygon)
-import rasterio as rio
+import re
+from copy import deepcopy
+
 import dask.bag as db
+import geopandas as gp
+import numpy as np
+import pandas as pd
+import pyproj
+import rasterio as rio
 from inpoly import inpoly2
+from pyproj import CRS, Transformer
 from scipy.interpolate import RegularGridInterpolator
+from shapely.geometry import (
+    LineString,
+    MultiLineString,
+    MultiPolygon,
+    Point,
+    Polygon,
+    box,
+)
 from tqdm import tqdm
+
+from . import classify, geometry, io, maps, process, utils
+from .Agent import gen_agent_meta, gen_track_meta
 
 GREEN = "\033[92m"
 ENDC = "\033[0m"
@@ -38,23 +35,26 @@ YELLOW = "\033[93m"
 
 ################################################################################
 
-#hardcoded file names
-agent_database = 'agent.db'
-track_database = 'track.db'
-dataset_meta = 'dataset.db'
+# hardcoded file names
+agent_database = "agent.db"
+track_database = "track.db"
+dataset_meta = "dataset.db"
+
 
 class Dataset:
-    
-    def __init__(self,
-                data_path='./data',
-                raw_files=None,
-                raw_df=None,
-                raw_gdf=None,
-                data_files=None,
-                meta={}):
+
+    def __init__(
+        self,
+        data_path="./data",
+        raw_files=None,
+        raw_df=None,
+        raw_gdf=None,
+        data_files=None,
+        meta={},
+    ):
         """
         Initializes a Dataset object.
-        
+
         Args:
             data_path (str): Defaults to './data'.
             raw_files (list, optional): List of raw data files. Defaults to None.
@@ -65,54 +65,61 @@ class Dataset:
         Returns:
             Dataset: Initialized Dataset object.
         """
-        #set attributes
+        # set attributes
         self.data_path = os.path.abspath(data_path)
         self.meta = self.check_meta(meta)
-        #set raw df
-        msg = 'raw_df must be None or pd.DataFrame'
+        # set raw df
+        msg = "raw_df must be None or pd.DataFrame"
         assert isinstance(raw_df, (type(None), pd.DataFrame)), msg
         self.raw_df = raw_df
-        #set raw gdf
-        msg = 'raw_gdf must be None or gp.GeoDataFrame'
+        # set raw gdf
+        msg = "raw_gdf must be None or gp.GeoDataFrame"
         assert isinstance(raw_gdf, (type(None), gp.GeoDataFrame)), msg
         self.raw_gdf = raw_gdf
-        #grab all processed files if None provided
+        # grab all processed files if None provided
         data_files = self._check_files(data_files)
-        #set file status
-        self.status = self._init_status(raw_files, 
-                                       data_files)
-    
+        # set file status
+        self.status = self._init_status(raw_files, data_files)
+
     def __repr__(self):
         submeta = self.meta.copy()
-        submeta.pop('Static Data')
-        submeta.pop('Dynamic Data')
-        m = [str(key)+': '+str(val)+'\n' for key,val in submeta.items()]
-        type_repr = f'Type:\n    {self.__class__}\n'
-        status_repr1 = f'Status:\n'
-        status_repr2 = f"    {len(self.status['Unprocessed'])} Unprocessed CSV Files\n"
-        status_repr3 = f"    {len(self.status['Processed'])} Processed CSV Files\n"
-        status_repr4 = f"    {len(self.status['Unsplit'])} Unsplit Agent Files\n"
+        submeta.pop("Static Data")
+        submeta.pop("Dynamic Data")
+        m = [str(key) + ": " + str(val) + "\n" for key, val in submeta.items()]
+        type_repr = f"Type:\n    {self.__class__}\n"
+        status_repr1 = "Status:\n"
+        status_repr2 = (
+            f"    {len(self.status['Unprocessed'])} Unprocessed CSV Files\n"
+        )
+        status_repr3 = (
+            f"    {len(self.status['Processed'])} Processed CSV Files\n"
+        )
+        status_repr4 = (
+            f"    {len(self.status['Unsplit'])} Unsplit Agent Files\n"
+        )
         status_repr5 = f"    {len(self.status['Split'])} Split Agent Files\n"
         data_repr1 = f"Static Data Fields:\n    {self.meta['Static Data']}\n"
         data_repr2 = f"Dynamic Data Fields:\n    {self.meta['Dynamic Data']}\n"
         meta_repr = f"Metadata:\n    {'    '.join(m)}"
-        path_repr = f'Data Path:\n    {os.path.abspath(self.data_path)}'
-        return (type_repr + 
-                status_repr1 + 
-                status_repr2 + 
-                status_repr3 + 
-                status_repr4 + 
-                status_repr5 + 
-                data_repr1 + 
-                data_repr2 + 
-                meta_repr + 
-                path_repr)
-        
+        path_repr = f"Data Path:\n    {os.path.abspath(self.data_path)}"
+        return (
+            type_repr
+            + status_repr1
+            + status_repr2
+            + status_repr3
+            + status_repr4
+            + status_repr5
+            + data_repr1
+            + data_repr2
+            + meta_repr
+            + path_repr
+        )
+
     ############################################################################
-    #ATTRIBUTES
+    # ATTRIBUTES
     ############################################################################
-    
-    #agent database
+
+    # agent database
     @property
     def agents(self):
         """
@@ -120,12 +127,16 @@ class Dataset:
         Use this to efficiently query agents.
         """
         try:
-            return utils.read_pkl(f'{self.data_path}/{agent_database}')
+            return utils.read_pkl(f"{self.data_path}/{agent_database}")
         except FileNotFoundError:
-            msg = RED + f"{self.data_path}/{agent_database} not found, run self.refresh_meta() first" + ENDC
+            msg = (
+                RED
+                + f"{self.data_path}/{agent_database} not found, run self.refresh_meta() first"
+                + ENDC
+            )
             print(msg)
-       
-    #track database
+
+    # track database
     @property
     def tracks(self):
         """
@@ -133,106 +144,116 @@ class Dataset:
         Use this to efficiently query tracks.
         """
         try:
-            return utils.read_pkl(f'{self.data_path}/{track_database}')
+            return utils.read_pkl(f"{self.data_path}/{track_database}")
         except FileNotFoundError:
-            msg = RED + f"{self.data_path}/{track_database} not found, run self.refresh_meta() first..." + ENDC
+            msg = (
+                RED
+                + f"{self.data_path}/{track_database} not found, run self.refresh_meta() first..."
+                + ENDC
+            )
             print(msg)
-    
-    #file mapper for each agent/track
+
+    # file mapper for each agent/track
     @property
     def _file_mapper(self):
-        #get the files and make mapper
-        unsplit = self.status['Unsplit']
-        split = self.status['Split']
-        mapper = {'Agents':{},
-                  'Tracks':{}}
-        #loop over unsplit (agent) files
-        for file in unsplit+split:
-            if file.endswith('.points'):
-                aid = os.path.basename(file).split('_processor')[0]
+        # get the files and make mapper
+        unsplit = self.status["Unsplit"]
+        split = self.status["Split"]
+        mapper = {"Agents": {}, "Tracks": {}}
+        # loop over unsplit (agent) files
+        for file in unsplit + split:
+            if file.endswith(".points"):
+                aid = os.path.basename(file).split("_processor")[0]
             else:
-                aid = os.path.basename(file).split('.tracks')[0]
-            if aid not in mapper['Agents'].keys():
-                mapper['Agents'][aid] = [os.path.abspath(file)]
+                aid = os.path.basename(file).split(".tracks")[0]
+            if aid not in mapper["Agents"].keys():
+                mapper["Agents"][aid] = [os.path.abspath(file)]
             else:
-                mapper['Agents'][aid].append(os.path.abspath(file))
-        #loop over split (track) files
+                mapper["Agents"][aid].append(os.path.abspath(file))
+        # loop over split (track) files
         for file in split:
-            aid = os.path.basename(file).split('.tracks')[0]
-            mapper['Tracks'][aid] = os.path.abspath(file)
+            aid = os.path.basename(file).split(".tracks")[0]
+            mapper["Tracks"][aid] = os.path.abspath(file)
         return mapper
-    
+
     ############################################################################
-    #METHODS
+    # METHODS
     ############################################################################
-   
+
     def _check_files(self, data_files):
-        #if None is passed
+        # if None is passed
         if data_files is None:
-            data_files = (glob.glob(f'{self.data_path}/*.tracks')+
-                         glob.glob(f'{self.data_path}/*.points'))
-        #otherwise use the list of files
+            data_files = glob.glob(f"{self.data_path}/*.tracks") + glob.glob(
+                f"{self.data_path}/*.points"
+            )
+        # otherwise use the list of files
         else:
             pass
-        #return abspaths
+        # return abspaths
         return list(map(os.path.abspath, data_files))
 
     def _init_status(self, raw, data):
-        #make a dictionary
-        status = {'Processed':[],
-                  'Unprocessed':[],
-                  'Split':[],
-                  'Unsplit':[]}
-        #add raw files
+        # make a dictionary
+        status = {
+            "Processed": [],
+            "Unprocessed": [],
+            "Split": [],
+            "Unsplit": [],
+        }
+        # add raw files
         if raw is not None:
-            status['Unprocessed'].extend(set(raw))
-        #add data files
+            status["Unprocessed"].extend(set(raw))
+        # add data files
         if data is not None:
             data = set(data)
-            #add pkl files, check for points vs tracks in file name
+            # add pkl files, check for points vs tracks in file name
             for p in data:
-                if p.endswith('.tracks'):
-                    status['Split'].append(p)
-                elif p.endswith('.points'):
-                    status['Unsplit'].append(p) 
+                if p.endswith(".tracks"):
+                    status["Split"].append(p)
+                elif p.endswith(".points"):
+                    status["Unsplit"].append(p)
         return status
 
     def _refresh_status(self):
-        #refresh file status after processing raw files
+        # refresh file status after processing raw files
         status = self._init_status(None, self._check_files(None))
-        return status    
-    
+        return status
+
     def _get_files_tracks_to_process(self, agents, tracks):
-        #get the files to process
+        # get the files to process
         all_files = self._file_mapper
         pkl_files = []
-        #based on agent ids
+        # based on agent ids
         if agents is not None:
             for agent in agents:
-                pkl_files.extend(all_files['Agents'][agent])
+                pkl_files.extend(all_files["Agents"][agent])
                 tracks = None
-        #based on track ids
+        # based on track ids
         elif tracks is not None:
             for track in tracks:
-                pkl_files.append(all_files['Tracks'][track.rsplit('_', 1)[0]])
-        #assuming all data
+                pkl_files.append(all_files["Tracks"][track.rsplit("_", 1)[0]])
+        # assuming all data
         else:
-            pkl_files = self.status['Split'].copy() + self.status['Unsplit'].copy()
+            pkl_files = (
+                self.status["Split"].copy() + self.status["Unsplit"].copy()
+            )
             tracks = None
-        #group them by agent id
-        df = pd.DataFrame({'files':pkl_files, 'track': tracks})
-        g = df['files'].tolist()
+        # group them by agent id
+        df = pd.DataFrame({"files": pkl_files, "track": tracks})
+        g = df["files"].tolist()
         g = [os.path.splitext(f)[0] for f in g]
-        for i,_g in enumerate(g):
-            replace = re.search('_processor[0-9]*', _g)
+        for i, _g in enumerate(g):
+            replace = re.search("_processor[0-9]*", _g)
             if replace:
-                g[i] = _g.replace(replace.group(), '')
-        df['grouper'] = g
-        grouped = df.groupby('grouper')[['files','track']].agg(list)
-        grouped['files'] = grouped['files'].apply(np.unique)
-        grouped['track'] = grouped['track'].apply(lambda x: np.unique(pd.Series(x).dropna()))
-        #return files and track ids corresponding to files
-        return grouped['files'].tolist(), grouped['track'].tolist()
+                g[i] = _g.replace(replace.group(), "")
+        df["grouper"] = g
+        grouped = df.groupby("grouper")[["files", "track"]].agg(list)
+        grouped["files"] = grouped["files"].apply(np.unique)
+        grouped["track"] = grouped["track"].apply(
+            lambda x: np.unique(pd.Series(x).dropna())
+        )
+        # return files and track ids corresponding to files
+        return grouped["files"].tolist(), grouped["track"].tolist()
 
     def _set_out_path(self, out_path):
         if out_path is None:
@@ -241,35 +262,38 @@ class Dataset:
             if not os.path.isdir(out_path):
                 os.mkdir(out_path)
         return out_path
-    
+
     def _update_meta(self, out_path, meta):
-        #if written to data_pth, update self.meta
+        # if written to data_pth, update self.meta
         if out_path == self.data_path:
             self.meta = meta
             out = self
-        #if written elsewhere, export the meta to there
+        # if written elsewhere, export the meta to there
         else:
-            #export meta
-            utils.save_pkl(f'{out_path}/{dataset_meta}', meta)
-            #replace the output
+            # export meta
+            utils.save_pkl(f"{out_path}/{dataset_meta}", meta)
+            # replace the output
             out = Dataset(data_path=out_path)
         return out
 
     ############################################################################
-    #PREPROCESSING
+    # PREPROCESSING
     ############################################################################
 
-    def group_points(self, 
-                     col_mapper={},
-                     meta_cols=[],
-                     data_cols=['Time','X','Y'],
-                     data_mappers={},
-                     groupby='Unique_ID',
-                     chunksize=1e6,
-                     continued=False,
-                     prefix='agent',
-                     ncores=1,
-                     desc='Grouping points'):
+    def group_points(
+        self,
+        col_mapper={},
+        meta_cols=[],
+        data_cols=["Time", "X", "Y"],
+        data_mappers={},
+        groupby="Unique_ID",
+        chunksize=1e6,
+        continued=False,
+        prefix="agent",
+        ncores=1,
+        sep=",",
+        desc="Grouping points",
+    ):
         """
         Groups all points in Dataset based on groupby column(s) to isolate
         the points belonging to each unique agent in the raw data. Grouped
@@ -291,14 +315,15 @@ class Dataset:
             continued (bool): Flag to indicate continuation of previous processing in Dataset.data_path. Defaults to False.
             prefix (str): Prefix for output files. Defaults to 'agent'.
             ncores (int): Number of cores to use for processing. Defaults to 1.
+            sep (str, optional): The separator of the csv file. Defaults to ','.
             desc (str): Description of the operation. Defaults to 'Grouping points'.
 
         Returns:
             self: Returns the original Dataset instance.
         """
-        #create folder if doesn't exist
-        #if does, prompt user to delete, or pass continued kwarg
-        #this prevents accidentally corrupting/overwriting data
+        # create folder if doesn't exist
+        # if does, prompt user to delete, or pass continued kwarg
+        # this prevents accidentally corrupting/overwriting data
         out_path = os.path.abspath(self.data_path)
         if continued:
             pass
@@ -306,72 +331,75 @@ class Dataset:
             if not os.path.exists(out_path):
                 os.mkdir(out_path)
             else:
-                raise Exception(f'self.data_path already exists, '\
-                                 'delete or pass continue=True to resume '\
-                                 'processing in this folder...')
-        #get the list of raw files
-        raw_files = self.status['Unprocessed'].copy()
-        #setup partials for function
-        partials = (groupby,
-                    chunksize,
-                    out_path,
-                    col_mapper,
-                    meta_cols,
-                    data_cols,
-                    data_mappers,
-                    prefix)
-        #if any raw files
+                raise Exception(
+                    "self.data_path already exists, "
+                    "delete or pass continue=True to resume "
+                    "processing in this folder..."
+                )
+        # get the list of raw files
+        raw_files = self.status["Unprocessed"].copy()
+        # setup partials for function
+        partials = (
+            groupby,
+            chunksize,
+            out_path,
+            col_mapper,
+            meta_cols,
+            data_cols,
+            data_mappers,
+            prefix,
+            sep,
+        )
+        # if any raw files
         if len(raw_files) > 0:
-            #process in parallel
-            utils.pool_caller(process.group_points, 
-                              partials, 
-                              raw_files, 
-                              desc, 
-                              ncores)
-        #check if raw dataframe passed
+            # process in parallel
+            utils.pool_caller(
+                process.group_points, partials, raw_files, desc, ncores
+            )
+        # check if raw dataframe passed
         if self.raw_df is not None:
-            #split into chunks
-            chunk_idxs = utils.split_list(list(range(len(self.raw_df))), 
-                                          round(len(self.raw_df)/ncores))
+            # split into chunks
+            chunk_idxs = utils.split_list(
+                list(range(len(self.raw_df))), round(len(self.raw_df) / ncores)
+            )
             chunks = [self.raw_df.iloc[idx] for idx in chunk_idxs]
-            #process in parallel
-            utils.pool_caller(process.group_points, 
-                              partials, 
-                              chunks, 
-                              desc,
-                              ncores)
-            #erase the df
+            # process in parallel
+            utils.pool_caller(
+                process.group_points, partials, chunks, desc, ncores
+            )
+            # erase the df
             self.raw_df = None
-        #check if raw geodataframe passed
+        # check if raw geodataframe passed
         if self.raw_gdf is not None:
-            #split into chunks
+            # split into chunks
             raw_df = utils.gdf_to_df(self.raw_gdf)
-            chunk_idxs = utils.split_list(list(range(len(raw_df))), 
-                                          round(len(raw_df)/ncores))
+            chunk_idxs = utils.split_list(
+                list(range(len(raw_df))), round(len(raw_df) / ncores)
+            )
             chunks = [raw_df.iloc[idx] for idx in chunk_idxs]
-            #process in parallel
-            utils.pool_caller(process.group_points, 
-                              partials, 
-                              chunks, 
-                              desc, 
-                              ncores)
-            #erase the gdf
+            # process in parallel
+            utils.pool_caller(
+                process.group_points, partials, chunks, desc, ncores
+            )
+            # erase the gdf
             self.raw_gdf = None
-        #refresh the status
+        # refresh the status
         self.status = self._refresh_status()
-        self.status['Unprocessed'] = []
-        self.status['Processed'].extend(raw_files)
+        self.status["Unprocessed"] = []
+        self.status["Processed"].extend(raw_files)
         return self
 
-    def split_tracks_spatiotemporal(self,
-                                    agents=None,
-                                    tracks=None,
-                                    time=3600 * 12, #seconds, 12hrs
-                                    distance=0.5, #same units as DataSet, default = 0.5deg = 55km
-                                    ncores=1, 
-                                    out_path=None,
-                                    remove=True,
-                                    desc='Splitting tracks using spatiotemporal threshold'): 
+    def split_tracks_spatiotemporal(
+        self,
+        agents=None,
+        tracks=None,
+        time=3600 * 12,  # seconds, 12hrs
+        distance=0.5,  # same units as DataSet, default = 0.5deg = 55km
+        ncores=1,
+        out_path=None,
+        remove=True,
+        desc="Splitting tracks using spatiotemporal threshold",
+    ):
         """
         Perform standard spatiotemporal split on points to generate tracks. This algorithm
         simply looks at gaps between adjacent points, if the gap in time OR distance is exceeded
@@ -383,7 +411,7 @@ class Dataset:
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -399,40 +427,46 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process tracks in parallel
-        utils.pool_caller(process.split_tracks_spatiotemporal,
-                          (time, distance, out_path, remove, 0), #split method
-                          pkl_groups,
-                          desc, 
-                          ncores)
-        #refresh the status
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process tracks in parallel
+        utils.pool_caller(
+            process.split_tracks_spatiotemporal,
+            (time, distance, out_path, remove, 0),  # split method
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # refresh the status
         self.status = self._refresh_status()
-        #update meta
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def split_tracks_by_data(self,
-                             agents=None,
-                             tracks=None,
-                             data_col='Status',
-                             ncores=1, 
-                             out_path=None,
-                             remove=True,
-                             desc='Splitting tracks by changes in data column'): 
+
+    def split_tracks_by_data(
+        self,
+        agents=None,
+        tracks=None,
+        data_col="Status",
+        ncores=1,
+        out_path=None,
+        remove=True,
+        desc="Splitting tracks by changes in data column",
+    ):
         """
         Splits tracks based on changes in a specified data column. This method is useful for segmenting
         tracks when a particular attribute changes, for example, when an agent's code column changes. This
-        function works by splitting tracks when the value in the specified data column changes, e.g. from 
+        function works by splitting tracks when the value in the specified data column changes, e.g. from
         True to False, from 0 to 1, etc.
 
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -447,31 +481,38 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process tracks in parallel
-        utils.pool_caller(process.split_tracks_by_data,
-                          (data_col, out_path, remove),
-                          pkl_groups,
-                          desc, 
-                          ncores)
-        #refresh the status
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+
+        # process tracks in parallel
+        utils.pool_caller(
+            process.split_tracks_by_data,
+            (data_col, out_path, remove),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # refresh the status
         self.status = self._refresh_status()
-        #update meta
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def split_overlapping_tracks_spatiotemporal(self,
-                                    agents=None,
-                                    tracks=None,
-                                    time=3600 * 12, #seconds, 12hrs
-                                    distance=0.5, #same units as DataSet, default = 0.5deg = 55km
-                                    ncores=1, 
-                                    out_path=None,
-                                    remove=True,
-                                    desc='Splitting overlapping tracks using spatiotemporal threshold'): 
+
+    def split_overlapping_tracks_spatiotemporal(
+        self,
+        agents=None,
+        tracks=None,
+        time=3600 * 12,  # seconds, 12hrs
+        distance=0.5,  # same units as DataSet, default = 0.5deg = 55km
+        ncores=1,
+        out_path=None,
+        remove=True,
+        desc="Splitting overlapping tracks using spatiotemporal threshold",
+    ):
         """
         Perform standard spatiotemporal split on points to generate tracks. This algorithm
         differs from split_tracks_spatiotemporal but uses the same inputs. This can sometimes
@@ -490,7 +531,7 @@ class Dataset:
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -506,34 +547,40 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process tracks in parallel
-        utils.pool_caller(process.split_tracks_spatiotemporal,
-                          (time, distance, out_path, remove, 1), #split method
-                          pkl_groups,
-                          desc, 
-                          ncores)
-        #refresh the status
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process tracks in parallel
+        utils.pool_caller(
+            process.split_tracks_spatiotemporal,
+            (time, distance, out_path, remove, 1),  # split method
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # refresh the status
         self.status = self._refresh_status()
-        #update meta
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def split_tracks_kmeans(self,
-                            agents=None,
-                            tracks=None,
-                            n_clusters=range(10),
-                            feature_cols=['X','Y'],
-                            out_path=None,
-                            ncores=1,
-                            return_error=False,
-                            remove=True,
-                            desc='Using KMeans clustering to split tracks',
-                            optimal_method='davies-bouldin',
-                            **kwargs):
+
+    def split_tracks_kmeans(
+        self,
+        agents=None,
+        tracks=None,
+        n_clusters=range(10),
+        feature_cols=["X", "Y"],
+        out_path=None,
+        ncores=1,
+        return_error=False,
+        remove=True,
+        desc="Using KMeans clustering to split tracks",
+        optimal_method="davies-bouldin",
+        **kwargs,
+    ):
         """
         Splits tracks using KMeans clustering based on specified features. This method attempts
         to identify natural groupings of data points within tracks based on the specified features
@@ -551,7 +598,7 @@ class Dataset:
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -572,57 +619,70 @@ class Dataset:
             - self: The Dataset instance, if return_error is False.
             - tuple: (self, error), where error is a DataFrame of errors for each cluster number in n_clusters, if return_error is True.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #make sure k is int or list of ints
-        msg = 'n_clusters must be int, list of ints, or range'
-        assert (isinstance(n_clusters, int) or 
-                (isinstance(n_clusters, list) and all([isinstance(_k, int) for _k in n_clusters])) or
-                isinstance(n_clusters, range)), msg
-        #turn to list for function
+        # make sure k is int or list of ints
+        msg = "n_clusters must be int, list of ints, or range"
+        assert (
+            isinstance(n_clusters, int)
+            or (
+                isinstance(n_clusters, list)
+                and all([isinstance(_k, int) for _k in n_clusters])
+            )
+            or isinstance(n_clusters, range)
+        ), msg
+        # turn to list for function
         if isinstance(n_clusters, int):
             n_clusters = [n_clusters]
         else:
             n_clusters = sorted(n_clusters)
-        #assert more than 2 clusters
-        msg = 'n_clusters must be 2 or greater'
+        # assert more than 2 clusters
+        msg = "n_clusters must be 2 or greater"
         assert min(n_clusters) > 1, msg
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process clustering in parallel
-        error = utils.pool_caller(process.split_tracks_kmeans,
-                                  (n_clusters, 
-                                   feature_cols, 
-                                   out_path, 
-                                   return_error, 
-                                   remove, 
-                                   optimal_method,
-                                   kwargs),
-                                  pkl_groups,
-                                  desc,
-                                  ncores)
-        #refresh the status
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process clustering in parallel
+        error = utils.pool_caller(
+            process.split_tracks_kmeans,
+            (
+                n_clusters,
+                feature_cols,
+                out_path,
+                return_error,
+                remove,
+                optimal_method,
+                kwargs,
+            ),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # refresh the status
         self.status = self._refresh_status()
-        #update meta
+        # update meta
         self = self._update_meta(out_path, self.meta)
-        #return
+        # return
         if return_error:
             error = utils.flatten(error)
             return self, pd.DataFrame(error)
         else:
             return self
-    
-    def split_tracks_dbscan(self,
-                            agents=None,
-                            tracks=None,
-                            feature_cols=['X','Y'],
-                            out_path=None,
-                            ncores=1,
-                            remove=True,
-                            eps=0.5,
-                            min_samples=2,
-                            desc='Using DBSCAN clustering to split tracks',
-                            **kwargs):
+
+    def split_tracks_dbscan(
+        self,
+        agents=None,
+        tracks=None,
+        feature_cols=["X", "Y"],
+        out_path=None,
+        ncores=1,
+        remove=True,
+        eps=0.5,
+        min_samples=2,
+        desc="Using DBSCAN clustering to split tracks",
+        **kwargs,
+    ):
         """
         Splits tracks using the DBSCAN clustering algorithm based on specified feature columns.
         This method groups points into clusters based on their density, allowing for the identification
@@ -636,7 +696,7 @@ class Dataset:
         If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -654,34 +714,35 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process clustering in parallel
-        utils.pool_caller(process.split_tracks_dbscan,
-                            (feature_cols, 
-                            out_path, 
-                            remove, 
-                            eps, 
-                            min_samples,
-                            kwargs),
-                            pkl_groups,
-                            desc,
-                            ncores)
-        #refresh the status
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process clustering in parallel
+        utils.pool_caller(
+            process.split_tracks_dbscan,
+            (feature_cols, out_path, remove, eps, min_samples, kwargs),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # refresh the status
         self.status = self._refresh_status()
-        #update meta
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def repair_tracks_spatiotemporal(self, 
-                                     agents=None,
-                                     time=3600 * 12, #seconds, 12hrs
-                                     distance=0.5, #same units as DataSet, default = 0.5deg = 55km
-                                     ncores=1, 
-                                     out_path=None,
-                                     desc='Repairing tracks using spatiotemporal threshold'):
+
+    def repair_tracks_spatiotemporal(
+        self,
+        agents=None,
+        time=3600 * 12,  # seconds, 12hrs
+        distance=0.5,  # same units as DataSet, default = 0.5deg = 55km
+        ncores=1,
+        out_path=None,
+        desc="Repairing tracks using spatiotemporal threshold",
+    ):
         """
         Repairs tracks by connecting disjoint segments based on spatiotemporal thresholds.
         This method is intended to identify and bridge gaps within tracks that are shorter than
@@ -694,7 +755,7 @@ class Dataset:
         erroneously split tracks.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -708,29 +769,28 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
+        # get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
-        #process repairs in parallel
-        utils.pool_caller(process.repair_tracks_spatiotemporal,
-                          (time, 
-                           distance, 
-                           out_path),
-                          pkl_files,
-                          desc,
-                          ncores)
-        #refresh the status
+        # process repairs in parallel
+        utils.pool_caller(
+            process.repair_tracks_spatiotemporal,
+            (time, distance, out_path),
+            pkl_files,
+            desc,
+            ncores,
+        )
+        # refresh the status
         self.status = self._refresh_status()
-        #update meta
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def remove_agents(self,
-                      agents=None,
-                      desc='Removing agents from Dataset',
-                      ncores=1):
+
+    def remove_agents(
+        self, agents=None, desc="Removing agents from Dataset", ncores=1
+    ):
         """
         Removes specified agents from the Dataset. This operation is designed to
         selectively remove agents based on their identifiers, facilitating data management
@@ -746,21 +806,19 @@ class Dataset:
         """
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
-        #remove the files in parallel
-        utils.pool_caller(os.remove, 
-                          (), 
-                          pkl_files, 
-                          desc, 
-                          ncores)
-        #refresh the status
+        # remove the files in parallel
+        utils.pool_caller(os.remove, (), pkl_files, desc, ncores)
+        # refresh the status
         self.status = self._refresh_status()
-        return self            
-    
-    def remove_tracks(self,
-                      tracks=None,
-                      ncores=1,
-                      out_path=None,
-                      desc='Removing tracks from Dataset'):
+        return self
+
+    def remove_tracks(
+        self,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Removing tracks from Dataset",
+    ):
         """
         Removes specified tracks from the Dataset. This operation is designed to
         selectively remove tracks based on their identifiers, facilitating data management
@@ -774,27 +832,26 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(None, tracks)))
-        utils.pool_caller(process.remove_tracks,
-                          (out_path,),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #refresh the status
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(None, tracks))
+        )
+        utils.pool_caller(
+            process.remove_tracks, (out_path,), pkl_groups, desc, ncores
+        )
+        # refresh the status
         self.status = self._refresh_status()
-        #update meta
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-        
-    def get_track_splits(self, 
-                         agents=None,
-                         ncores=1,
-                         desc='Getting track split data'):
+
+    def get_track_splits(
+        self, agents=None, ncores=1, desc="Getting track split data"
+    ):
         """
-        Retrieves data related to the gaps between tracks. This function is useful for analyzing 
+        Retrieves data related to the gaps between tracks. This function is useful for analyzing
         how tracks have been divided spatiotemporally, and potentially isolating a list of
         tracks to rejoin.
 
@@ -807,41 +864,40 @@ class Dataset:
         Returns:
             DataFrame: A pandas DataFrame containing the track split data.
         """
-        #get the files to process
+        # get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
-        #loop through each, process to split tracks
-        rows = utils.pool_caller(process.get_track_gaps,
-                                 (),
-                                 pkl_files,
-                                 desc,
-                                 ncores)
+        # loop through each, process to split tracks
+        rows = utils.pool_caller(
+            process.get_track_gaps, (), pkl_files, desc, ncores
+        )
         rows = utils.flatten(rows)
         df = pd.DataFrame(rows)
-        df['Connect'] = False
+        df["Connect"] = False
         return df
 
     ############################################################################
-    #METADATA
+    # METADATA
     ############################################################################
 
     def check_meta(self, meta):
-        #try to fetch the meta if already exists
+        # try to fetch the meta if already exists
         if meta == {}:
             try:
-                meta = utils.read_pkl(f'{self.data_path}/{dataset_meta}')
+                meta = utils.read_pkl(f"{self.data_path}/{dataset_meta}")
             except FileNotFoundError:
-                msg = f'\nNo {dataset_meta} found in {self.data_path}. '\
-                       '\nUsing default units/crs. '\
-                       '\nEdit self.meta and then run self.refresh_meta to update.\n'
+                msg = (
+                    f"\nNo {dataset_meta} found in {self.data_path}. "
+                    "\nUsing default units/crs. "
+                    "\nEdit self.meta and then run self.refresh_meta to update.\n"
+                )
                 print(msg)
                 meta = utils.std_meta()
         return meta
 
-    def refresh_meta(self, 
-                     agents_only=False, 
-                     ncores=1,
-                     desc='Refreshing metadata'):
+    def refresh_meta(
+        self, agents_only=False, ncores=1, desc="Refreshing metadata"
+    ):
         """
         Refreshes the metadata associated with the Dataset. This involves updating the
         dataset.db, agent.db, and track.db files stored in the Dataset.data_path folder.
@@ -850,9 +906,9 @@ class Dataset:
 
         You only need to do this if you want the .db files to be updated, which is only
         necessary if you need an updated output for Dataset.meta, Dataset.agents, or Dataset.tracks.
-        
+
         Passing agents_only=True should only be used when points have been grouped into *.points files
-        but have not yet been split into tracks. This will provide metadata on the agents that 
+        but have not yet been split into tracks. This will provide metadata on the agents that
         can be useful for doing categorical splitting. For example, splitting AIS data for cargo vessels
         differently than fishing vessels.
 
@@ -866,57 +922,57 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #process metadata in parallel
-        iterable = self.status['Unsplit'] + self.status['Split']
-        #assert there's even data
-        assert len(iterable) > 0, f'No point or track files in {self.data_path}'
-        meta_metacols_datacols = utils.pool_caller(_refresh_meta,
-                                                    (agents_only,),
-                                                    iterable,
-                                                    desc,
-                                                    ncores)
+        # process metadata in parallel
+        iterable = self.status["Unsplit"] + self.status["Split"]
+        # assert there's even data
+        assert (
+            len(iterable) > 0
+        ), f"No point or track files in {self.data_path}"
+        meta_metacols_datacols = utils.pool_caller(
+            _refresh_meta, (agents_only,), iterable, desc, ncores
+        )
         _meta = [m[0] for m in meta_metacols_datacols]
-        _meta_cols = np.unique(utils.flatten([m[1] for 
-                                              m in meta_metacols_datacols])).tolist()
-        _data_cols = np.unique(utils.flatten([m[2] for 
-                                              m in meta_metacols_datacols])).tolist()
-        #combine into 1 dict
+        _meta_cols = np.unique(
+            utils.flatten([m[1] for m in meta_metacols_datacols])
+        ).tolist()
+        _data_cols = np.unique(
+            utils.flatten([m[2] for m in meta_metacols_datacols])
+        ).tolist()
+        # combine into 1 dict
         meta = {}
         for m in _meta:
             meta |= m
-        #get and write agent database
-        agents = _meta_to_agents(meta, self.meta['CRS'])
-        #convert datetimes
-        agents['Start Time'] = pd.to_datetime(agents['Start Time'])
-        agents['End Time'] = pd.to_datetime(agents['End Time'])
-        #save agent database
-        utils.save_pkl(f'{self.data_path}/{agent_database}', agents)
-        #if there's track data
-        if len(self.status['Split']) > 0:
-            #get and write track database
-            tracks = _meta_to_tracks(meta, self.meta['CRS'])
-            #convert the datetimes
-            tracks['Start Time'] = pd.to_datetime(tracks['Start Time'])
-            tracks['End Time'] = pd.to_datetime(tracks['End Time'])
-            #save track database
-            utils.save_pkl(f'{self.data_path}/{track_database}', tracks)
+        # get and write agent database
+        agents = _meta_to_agents(meta, self.meta["CRS"])
+        # convert datetimes
+        agents["Start Time"] = pd.to_datetime(agents["Start Time"])
+        agents["End Time"] = pd.to_datetime(agents["End Time"])
+        # save agent database
+        utils.save_pkl(f"{self.data_path}/{agent_database}", agents)
+        # if there's track data
+        if len(self.status["Split"]) > 0:
+            # get and write track database
+            tracks = _meta_to_tracks(meta, self.meta["CRS"])
+            # convert the datetimes
+            tracks["Start Time"] = pd.to_datetime(tracks["Start Time"])
+            tracks["End Time"] = pd.to_datetime(tracks["End Time"])
+            # save track database
+            utils.save_pkl(f"{self.data_path}/{track_database}", tracks)
         else:
-            #if only unsplit point files
-            print(f'No split track files found, skipping {track_database}')
-        #save the latest dataset meta
+            # if only unsplit point files
+            print(f"No split track files found, skipping {track_database}")
+        # save the latest dataset meta
         meta = self.meta
-        meta['Static Data'] = _meta_cols
-        meta['Dynamic Data'] = _data_cols
-        utils.save_pkl(f'{self.data_path}/{dataset_meta}', meta)
-        #return
-        print(f'New meta/databases saved to {self.data_path}')
+        meta["Static Data"] = _meta_cols
+        meta["Dynamic Data"] = _data_cols
+        utils.save_pkl(f"{self.data_path}/{dataset_meta}", meta)
+        # return
+        print(f"New meta/databases saved to {self.data_path}")
         return self
 
-    def make_meta_mapper(self,
-                         meta_cols,
-                         agents=None,
-                         ncores=1,
-                         desc='Making meta mappers'):
+    def make_meta_mapper(
+        self, meta_cols, agents=None, ncores=1, desc="Making meta mappers"
+    ):
         """
         Creates a metadata mapper dictionary based on the meta_cols provided. This mapper can be used to
         translate or map metadata values, potentially simplifying data analysis and manipulation
@@ -933,42 +989,42 @@ class Dataset:
             dict: A dictionary where keys are the names of the data columns specified in `meta_cols`, and
                 the values are the created data mappers.
         """
-        #must be list of data columns
-        msg = 'meta_cols must be a list of meta columns'
+        # must be list of data columns
+        msg = "meta_cols must be a list of meta columns"
         assert isinstance(meta_cols, list) and len(meta_cols) > 0, msg
-        #get the files to process
+        # get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
-        #read data from agents in parallel
-        _out =  utils.pool_caller(maps.make_meta_mapper,
-                                 (meta_cols,),
-                                 pkl_files,
-                                 desc,
-                                 ncores)
-        #reduce to unique dictionary
+        # read data from agents in parallel
+        _out = utils.pool_caller(
+            maps.make_meta_mapper, (meta_cols,), pkl_files, desc, ncores
+        )
+        # reduce to unique dictionary
         out = utils.flatten_dict_unique(_out)
-        #turn into blank mapper
-        mappers = [{k:None for k in out[key]} for key in meta_cols]
-        #if single mapper just return it
+        # turn into blank mapper
+        mappers = [{k: None for k in out[key]} for key in meta_cols]
+        # if single mapper just return it
         if len(mappers) == 1:
             return mappers[0]
-        #otherwise nested dict
+        # otherwise nested dict
         else:
             return dict(zip(meta_cols, mappers))
 
-    def drop_meta(self, 
-                  meta_cols,
-                  agents=None,
-                  out_path=None,
-                  ncores=1,
-                  desc='Dropping meta from agents'):
+    def drop_meta(
+        self,
+        meta_cols,
+        agents=None,
+        out_path=None,
+        ncores=1,
+        desc="Dropping meta from agents",
+    ):
         """
         Drops specified metadata from agents. This function allows for selective removal of metadata
         associated with certain agents, potentially for data cleaning, or to reduce
         dataset size.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -983,34 +1039,38 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #must be list of data columns
-        msg = 'meta_cols must be a list of meta columns'
+        # must be list of data columns
+        msg = "meta_cols must be a list of meta columns"
         assert isinstance(meta_cols, list) and len(meta_cols) > 0, msg
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
+        # get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
-        #delete data from agents in parallel
-        utils.pool_caller(maps.drop_agent_meta,
-                        (meta_cols, out_path),
-                        pkl_files,
-                        desc,
-                        ncores)
-        #update meta
+        # delete data from agents in parallel
+        utils.pool_caller(
+            maps.drop_agent_meta,
+            (meta_cols, out_path),
+            pkl_files,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-        
-    def map_meta(self,
-                meta_cols, 
-                out_meta_cols,
-                meta_mappers,
-                agents=None,
-                out_path=None,
-                ncores=1,
-                drop=False,
-                fill=None,
-                desc='Mapping metadata to agent'):
+
+    def map_meta(
+        self,
+        meta_cols,
+        out_meta_cols,
+        meta_mappers,
+        agents=None,
+        out_path=None,
+        ncores=1,
+        drop=False,
+        fill=None,
+        desc="Mapping metadata to agent",
+    ):
         """
         Applies a mapping function to transform metadata of selected agents. This can be used to
         normalize, categorize, or otherwise process metadata fields for consistency, analysis,
@@ -1018,7 +1078,7 @@ class Dataset:
         how input metadata values are mapped to output values.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1039,32 +1099,36 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #must be list and proper dict
-        msg = f'meta_mappers missing one or all of keys: {meta_cols}'
+        # must be list and proper dict
+        msg = f"meta_mappers missing one or all of keys: {meta_cols}"
         assert all([i in meta_mappers.keys() for i in meta_cols]), msg
-        msg = 'out_meta_cols is not the same length as meta_cols'
+        msg = "out_meta_cols is not the same length as meta_cols"
         assert len(meta_cols) == len(out_meta_cols), msg
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
+        # get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
-        #map metadata to agents in parallel
-        utils.pool_caller(maps.map_agent_meta,
-                          (meta_cols, out_meta_cols, meta_mappers, out_path, drop, fill),
-                          pkl_files,
-                          desc,
-                          ncores)
-        #update meta
+        # map metadata to agents in parallel
+        utils.pool_caller(
+            maps.map_agent_meta,
+            (meta_cols, out_meta_cols, meta_mappers, out_path, drop, fill),
+            pkl_files,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def make_data_mapper(self,
-                         data_cols,
-                         agents=None,
-                         tracks=None,
-                         ncores=1,
-                         desc='Making data mappers'):
+
+    def make_data_mapper(
+        self,
+        data_cols,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        desc="Making data mappers",
+    ):
         """
         Creates a mapping for data columns to facilitate data transformation. This function
         can be particularly useful for preparing data for machine learning models, data visualization,
@@ -1087,40 +1151,42 @@ class Dataset:
             dict: A dictionary where keys are the names of the data columns specified in `data_cols`, and
                 the values are the created data mappers.
         """
-        #must be list of data columns
-        msg = 'data_cols must be a list of data columns'
+        # must be list of data columns
+        msg = "data_cols must be a list of data columns"
         assert isinstance(data_cols, list) and len(data_cols) > 0, msg
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #read data from agents in parallel
-        _out =  utils.pool_caller(maps.make_data_mapper,
-                                 (data_cols,),
-                                 pkl_groups,
-                                 desc,
-                                 ncores)
-        #reduce to unique dictionary
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # read data from agents in parallel
+        _out = utils.pool_caller(
+            maps.make_data_mapper, (data_cols,), pkl_groups, desc, ncores
+        )
+        # reduce to unique dictionary
         out = utils.flatten_dict_unique(_out)
-        #turn into blank mapper
-        mappers = [{k:None for k in out[key]} for key in data_cols]
-        #if single mapper just return it
+        # turn into blank mapper
+        mappers = [{k: None for k in out[key]} for key in data_cols]
+        # if single mapper just return it
         if len(mappers) == 1:
             return mappers[0]
         else:
             return dict(zip(data_cols, mappers))
-    
-    def drop_data(self, 
-                  data_cols,
-                  agents=None,
-                  out_path=None,
-                  ncores=1,
-                  desc='Dropping dynamic data from agents'):
+
+    def drop_data(
+        self,
+        data_cols,
+        agents=None,
+        out_path=None,
+        ncores=1,
+        desc="Dropping dynamic data from agents",
+    ):
         """
         Drops specified dynamic data from agents. This function allows for selective removal of data
         associated with certain agents, potentially for data cleaning, or to reduce
         dataset size.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1135,35 +1201,39 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #must be list of data columns
-        msg = 'data_cols must be a list of data columns'
+        # must be list of data columns
+        msg = "data_cols must be a list of data columns"
         assert isinstance(data_cols, list) and len(data_cols) > 0, msg
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
+        # get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
-        #delete data from agents in parallel
-        utils.pool_caller(maps.drop_agent_data,
-                        (data_cols, out_path),
-                        pkl_files,
-                        desc,
-                        ncores)
-        #update meta
+        # delete data from agents in parallel
+        utils.pool_caller(
+            maps.drop_agent_data,
+            (data_cols, out_path),
+            pkl_files,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def map_data(self,
-                data_cols=[],
-                out_data_cols=[],
-                data_mappers={},
-                agents=None,
-                tracks=None,
-                out_path=None,
-                ncores=1,
-                drop=False,
-                fill=None,
-                desc='Mapping agent dynamic data'):
+
+    def map_data(
+        self,
+        data_cols=[],
+        out_data_cols=[],
+        data_mappers={},
+        agents=None,
+        tracks=None,
+        out_path=None,
+        ncores=1,
+        drop=False,
+        fill=None,
+        desc="Mapping agent dynamic data",
+    ):
         """
         Applies a mapping function to transform dynamic data of selected agents/tracks. This can be used to
         normalize, categorize, or otherwise process data fields for consistency, analysis,
@@ -1171,7 +1241,7 @@ class Dataset:
         how input data values are mapped to output values.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1191,35 +1261,41 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #must be list and proper dict
-        msg = f'data_mappers missing one or all of keys: {data_cols}'
+        # must be list and proper dict
+        msg = f"data_mappers missing one or all of keys: {data_cols}"
         assert all([i in data_mappers.keys() for i in data_cols]), msg
-        msg = 'out_data_cols is not the same length as data_cols'
+        msg = "out_data_cols is not the same length as data_cols"
         assert len(data_cols) == len(out_data_cols), msg
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #map agent data in parallel
-        utils.pool_caller(maps.map_agent_data,
-                          (data_cols, out_data_cols, data_mappers, out_path, drop, fill),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # map agent data in parallel
+        utils.pool_caller(
+            maps.map_agent_data,
+            (data_cols, out_data_cols, data_mappers, out_path, drop, fill),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
 
-    def map_data_to_codes(self,
-                          data_cols,
-                          data_mappers,
-                          agents=None,
-                          tracks=None,
-                          out_path=None,
-                          ncores=1,
-                          drop=False,
-                          fill=-1,
-                          desc='Mapping agent dynamic data to coded boolean arrays'):
+    def map_data_to_codes(
+        self,
+        data_cols,
+        data_mappers,
+        agents=None,
+        tracks=None,
+        out_path=None,
+        ncores=1,
+        drop=False,
+        fill=-1,
+        desc="Mapping agent dynamic data to coded boolean arrays",
+    ):
         """
         Applies a mapping function to transform dynamic data of selected agents/tracks into boolean "Code"
         columns.
@@ -1230,13 +1306,13 @@ class Dataset:
 
         Each boolean column will be called "Code{i}" where i corresponds to one of the unique integers
         in the dictionary values.
-          
+
         This can be used to encode information into boolean code columns that will be available
         in the Dataset.agents and Dataset.tracks attributes, which could make for faster and more
         efficient querying.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1255,36 +1331,40 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #must be list and proper dict
-        msg = 'data_cols must be a list of data columns'
-        assert len(data_cols)>0 and isinstance(data_cols, list), msg
-        msg = f'data_mappers missing one or all of keys: {data_cols}'
+        # must be list and proper dict
+        msg = "data_cols must be a list of data columns"
+        assert len(data_cols) > 0 and isinstance(data_cols, list), msg
+        msg = f"data_mappers missing one or all of keys: {data_cols}"
         assert all([i in data_mappers.keys() for i in data_cols]), msg
-        #assert all mapper values are integer
-        msg = 'All mapper values must be integer codes'
+        # assert all mapper values are integer
+        msg = "All mapper values must be integer codes"
         for m in data_mappers.values():
             assert all([isinstance(v, int) for v in m.values()]), msg
-        #check fill value
-        assert isinstance(fill, int), 'fill value must be integer'
-        #set out path
+        # check fill value
+        assert isinstance(fill, int), "fill value must be integer"
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #map agent data in parallel
-        utils.pool_caller(maps.map_agent_data_to_codes,
-                          (data_cols, data_mappers, out_path, drop, fill),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # map agent data in parallel
+        utils.pool_caller(
+            maps.map_agent_data_to_codes,
+            (data_cols, data_mappers, out_path, drop, fill),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
 
     ############################################################################
-    #FETCHERS
+    # FETCHERS
     ############################################################################
 
-    #make deepcopy
+    # make deepcopy
     def copy(self):
         """
         Creates a deepcopy of the input Dataset.
@@ -1293,8 +1373,8 @@ class Dataset:
             Dataset: Deepcopy of the input Dataset.
         """
         return deepcopy(self)
-    
-    #get one agent
+
+    # get one agent
     def get_agent(self, agent):
         """
         Reads and returns one single agent file, specified by Agent ID.
@@ -1305,9 +1385,9 @@ class Dataset:
         Returns:
             Dataset: The requested agent.
         """
-        return utils.collect_agent_pkls(self._file_mapper['Agents'][agent])
-    
-    #get specific agents
+        return utils.collect_agent_pkls(self._file_mapper["Agents"][agent])
+
+    # get specific agents
     def get_agents(self, agents, ncores=1):
         """
         Reads and returns a list of agent files, specified by Agent IDs.
@@ -1318,17 +1398,22 @@ class Dataset:
         Returns:
             list: List of the requested agents.
         """
-        agent_files = self._file_mapper['Agents']
+        agent_files = self._file_mapper["Agents"]
         files = [agent_files[a] for a in agents]
-        #process in parallel
+        # process in parallel
         with mp.Pool(ncores) as pool:
-            out = pool.map(utils.collect_agent_pkls, tqdm(files, 
-                                                          desc=GREEN+'Getting agents'+ENDC,
-                                                          total=len(files),
-                                                          colour='GREEN'))
+            out = pool.map(
+                utils.collect_agent_pkls,
+                tqdm(
+                    files,
+                    desc=GREEN + "Getting agents" + ENDC,
+                    total=len(files),
+                    colour="GREEN",
+                ),
+            )
         return out
-    
-    #get one track
+
+    # get one track
     def get_track(self, track):
         """
         Reads and returns one single track, specified by Track ID.
@@ -1339,12 +1424,12 @@ class Dataset:
         Returns:
             Dataset: The requested track.
         """
-        aid, tid = track.rsplit('_',1)
-        file = self._file_mapper['Tracks'][aid]
+        aid, tid = track.rsplit("_", 1)
+        file = self._file_mapper["Tracks"][aid]
         a = utils.read_pkl(file)
         return a.tracks[tid]
-            
-    #get specific tracks
+
+    # get specific tracks
     def get_tracks(self, tracks, ncores=1):
         """
         Reads and returns a list of tracks, specified by Track IDs.
@@ -1355,15 +1440,20 @@ class Dataset:
         Returns:
             list: List of the requested tracks.
         """
-        aids = list(map(lambda x: x.rsplit('_', 1)[0], tracks))
-        files = [self._file_mapper['Tracks'][a] for a in aids]
-        #process in parallel
+        aids = list(map(lambda x: x.rsplit("_", 1)[0], tracks))
+        files = [self._file_mapper["Tracks"][a] for a in aids]
+        # process in parallel
         with mp.Pool(ncores) as pool:
-            out = pool.map(utils.read_pkl, tqdm(files, 
-                                                desc=GREEN+'Getting tracks'+ENDC,
-                                                total=len(files), 
-                                                colour='GREEN'))
-        #collect tracks
+            out = pool.map(
+                utils.read_pkl,
+                tqdm(
+                    files,
+                    desc=GREEN + "Getting tracks" + ENDC,
+                    total=len(files),
+                    colour="GREEN",
+                ),
+            )
+        # collect tracks
         out_tracks = []
         for ves in out:
             for tid in ves.tracks.keys():
@@ -1371,16 +1461,18 @@ class Dataset:
                     out_tracks.append(ves.tracks[tid])
         return out_tracks
 
-    def to_gdf(self, 
-               agents=None,
-               tracks=None,
-               code=None,
-               ncores=1,
-               segments=False,
-               method='middle',
-               desc='Converting tracks to GeoDataFrame'):
+    def to_gdf(
+        self,
+        agents=None,
+        tracks=None,
+        code=None,
+        ncores=1,
+        segments=False,
+        method="middle",
+        desc="Converting tracks to GeoDataFrame",
+    ):
         """
-        Converts requested agents/tracks into a GeoDataFrame (gdf). 
+        Converts requested agents/tracks into a GeoDataFrame (gdf).
 
         By default, one LineString is created for each track. You can pass segments=True to "explode"
         these LineStrings and create N number of LineString segments for each track that has N+1 points.
@@ -1414,43 +1506,45 @@ class Dataset:
         Returns:
             GeoDataFrame: A GeoPandas GeoDataFrame containing the converted track data.
         """
-        #change desc
+        # change desc
         if segments:
-            desc = 'Converting track segments to GeoDataFrame'
-        #assert method is valid
+            desc = "Converting track segments to GeoDataFrame"
+        # assert method is valid
         if segments:
-            msg = 'method must be backward, middle, or forward'
-            assert method in ['backward','middle','forward'], msg
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))  
-        #process to gdf in parallel
-        rows = utils.pool_caller(io.to_gdf,
-                                 (code, segments, method),
-                                 pkl_groups,
-                                 desc,
-                                 ncores)
-        #flatten and convert to gdf
+            msg = "method must be backward, middle, or forward"
+            assert method in ["backward", "middle", "forward"], msg
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process to gdf in parallel
+        rows = utils.pool_caller(
+            io.to_gdf, (code, segments, method), pkl_groups, desc, ncores
+        )
+        # flatten and convert to gdf
         rows = utils.flatten(rows)
-        #if empty
+        # if empty
         if len(rows) == 0:
             gdf = gp.GeoDataFrame()
         else:
-            gdf = gp.GeoDataFrame(rows, 
-                                  crs=self.meta['CRS'], 
-                                  geometry='geometry')
-            #make index column
+            gdf = gp.GeoDataFrame(
+                rows, crs=self.meta["CRS"], geometry="geometry"
+            )
+            # make index column
             if segments:
-                gdf.index = gdf['Segment ID'].values
+                gdf.index = gdf["Segment ID"].values
             else:
-                gdf.index = gdf['Track ID'].values
+                gdf.index = gdf["Track ID"].values
         return gdf
-    
-    def to_df(self,
-              agents=None,
-              tracks=None,
-              code=None,
-              ncores=1,
-              desc='Converting tracks to DataFrame'):
+
+    def to_df(
+        self,
+        agents=None,
+        tracks=None,
+        code=None,
+        ncores=1,
+        desc="Converting tracks to DataFrame",
+    ):
         """
         Converts agent/track data into a pandas DataFrame. This method allows for simple integration
         of pandas into data processing workflows, and leveraging the pandas framework and built-in tools.
@@ -1478,20 +1572,17 @@ class Dataset:
         Returns:
             DataFrame: A pandas DataFrame containing the converted data.
         """
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))  
-        #process to gdf in parallel
-        dfs = utils.pool_caller(io.to_df,
-                                (code,),
-                                pkl_groups,
-                                desc,
-                                ncores)
-        #flatten and convert to df
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process to gdf in parallel
+        dfs = utils.pool_caller(io.to_df, (code,), pkl_groups, desc, ncores)
+        # flatten and convert to df
         dfs = utils.flatten(dfs)
         return pd.concat(dfs)
-    
-    def to_dask_bag(self, 
-                    agents=None):
+
+    def to_dask_bag(self, agents=None):
         """
         Converts the dataset for specified agents into a Dask Bag, enabling parallel processing and analysis
         of large datasets that do not fit into memory. Dask Bags are well-suited for working with unstructured
@@ -1510,31 +1601,33 @@ class Dataset:
         Returns:
             dask.bag.Bag: A Dask Bag object where each element in the bag is a trackio.Agent.
         """
-        #get the files to process
+        # get the files to process
         pkl_files, _ = self._get_files_tracks_to_process(agents, None)
         pkl_files = utils.flatten(pkl_files)
-        #create bag
+        # create bag
         bag = db.from_sequence(pkl_files)
         return bag.map(utils.read_pkl)
 
     ############################################################################
-    #GEOMETRIC
+    # GEOMETRIC
     ############################################################################
-    
-    def reproject_crs(self, 
-                      crs,
-                      agents=None,
-                      tracks=None, 
-                      ncores=1, 
-                      out_path=None,
-                      desc='Reprojecting CRS'):
+
+    def reproject_crs(
+        self,
+        crs,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Reprojecting CRS",
+    ):
         """
         Reprojects the coordinate reference system (CRS) of the dataset's geographic data to a new CRS.
 
         The target CRS can be a EPSG code, WKT string, pyproj.CRS object, etc.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1553,42 +1646,48 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #get crs
-        crs1 = CRS(self.meta['CRS'])
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # get crs
+        crs1 = CRS(self.meta["CRS"])
         crs2 = CRS(crs)
-        #if already same crs
+        # if already same crs
         if crs1.equals(crs2):
             pass
-        #if different crs
+        # if different crs
         else:
-            #make transformer once
+            # make transformer once
             transformer = Transformer.from_crs(crs1, crs2, always_xy=True)
-            #reproject in parallel
-            utils.pool_caller(geometry.reproject_crs,
-                                (transformer, out_path),
-                                pkl_groups,
-                                desc, 
-                                ncores)
-            #reset/write the meta
+            # reproject in parallel
+            utils.pool_caller(
+                geometry.reproject_crs,
+                (transformer, out_path),
+                pkl_groups,
+                desc,
+                ncores,
+            )
+            # reset/write the meta
             meta = self.meta.copy()
-            meta['CRS'] = crs2
-            meta['X'] = crs2.axis_info[0].unit_name
-            meta['Y'] = crs2.axis_info[1].unit_name
-            #update meta
+            meta["CRS"] = crs2
+            meta["X"] = crs2.axis_info[0].unit_name
+            meta["Y"] = crs2.axis_info[1].unit_name
+            # update meta
             self = self._update_meta(out_path, meta)
         return self
-         
-    def resample_spacing(self, 
-                         spacing, 
-                         agents=None,
-                         tracks=None, 
-                         ncores=1, 
-                         out_path=None,
-                         desc='Resampling track spacing'):
+
+    def resample_spacing(
+        self,
+        spacing,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Resampling track spacing",
+    ):
         """
         Resamples the points of tracks to a specified spacing. This is useful for standardizing
         the distance between consecutive points in track data, facilitating analyses that require uniform
@@ -1596,7 +1695,7 @@ class Dataset:
         desired spacing.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
 
@@ -1618,27 +1717,33 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(geometry.resample_spacing,
-                          (spacing, out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            geometry.resample_spacing,
+            (spacing, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-        
-    def resample_time(self, 
-                      seconds, 
-                      agents=None,
-                      tracks=None, 
-                      ncores=1, 
-                      out_path=None,
-                      desc='Resampling track timing'):
+
+    def resample_time(
+        self,
+        seconds,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Resampling track timing",
+    ):
         """
         Resamples the points of tracks to a specified temporal spacing. This is useful for standardizing
         the timing between consecutive points in track data, facilitating analyses that require uniform
@@ -1646,7 +1751,7 @@ class Dataset:
         desired temporal spacing.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1665,27 +1770,33 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(geometry.resample_time,
-                          (seconds, out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            geometry.resample_time,
+            (seconds, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def resample_time_global(self, 
-                             time, 
-                             agents=None,
-                             tracks=None, 
-                             ncores=1, 
-                             out_path=None,
-                             desc='Resampling tracks to global time axis'):
+
+    def resample_time_global(
+        self,
+        time,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Resampling tracks to global time axis",
+    ):
         """
         Resamples the points of tracks to a global time axis.
 
@@ -1696,7 +1807,7 @@ class Dataset:
         This may also be useful for standardizing data for ML approaches.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1716,43 +1827,49 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #convert incase
+        # convert incase
         time = pd.to_datetime(time)
-        #assert entire dataset is spanned
+        # assert entire dataset is spanned
         adb = self.agents
-        start = adb['Start Time'].min()
-        end = adb['End Time'].max()
-        msg = f'Global time must span entire dataset from {start} to {end} inclusive'
+        start = adb["Start Time"].min()
+        end = adb["End Time"].max()
+        msg = f"Global time must span entire dataset from {start} to {end} inclusive"
         assert start >= time[0] and end <= time[-1], msg
-        #convert times to seconds
-        _time = time.astype(np.int64)/1e9 #seconds
-        #set out path
+        # convert times to seconds
+        _time = time.astype(np.int64) / 1e9  # seconds
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(geometry.resample_time_global,
-                          (_time, out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            geometry.resample_time_global,
+            (_time, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
-        return self    
+        return self
 
-    def compute_coursing(self, 
-                         agents=None,
-                         tracks=None, 
-                         ncores=1, 
-                         out_path=None,
-                         method='middle',
-                         desc='Computing coursing'):
+    def compute_coursing(
+        self,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        method="middle",
+        desc="Computing coursing",
+    ):
         """
         Computes the coursing of tracks based on the direction travelled between points. This gets added
         as a "Coursing" column in the track data.
 
         The method kwarg must be one of ['forward', 'middle', 'backward'] and corresponds to which pairs of
-        points to use for determining coursing values, and how to fill the remaining point. 
+        points to use for determining coursing values, and how to fill the remaining point.
 
         If 'forward', the coursing at each point is calculated by the direction from the current
         point to the next point. The first point on the track then gets filled with the coursing of the second point.
@@ -1763,9 +1880,9 @@ class Dataset:
         If 'middle', it uses an average of both and no filling is required.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
-        
+
         Args:
             agents (list, optional): A list of agent IDs for which coursing will be computed. If None, coursing
                                     will be computed for all agents available in the dataset.
@@ -1782,32 +1899,38 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #assert method
-        msg = 'method must be backward, middle, or forward'
-        assert method in ['backward','middle','forward'], msg
-        #set out path
+        # assert method
+        msg = "method must be backward, middle, or forward"
+        assert method in ["backward", "middle", "forward"], msg
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #recompute in parallel
-        utils.pool_caller(geometry.compute_coursing,
-                          (method, self.meta['CRS'], out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)       
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # recompute in parallel
+        utils.pool_caller(
+            geometry.compute_coursing,
+            (method, self.meta["CRS"], out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = self.meta.copy()
-        meta['Coursing'] = 'degrees'
+        meta["Coursing"] = "degrees"
         self = self._update_meta(out_path, meta)
         return self
-    
-    def compute_turning_rate(self, 
-                             agents=None,
-                             tracks=None, 
-                             ncores=1, 
-                             out_path=None,
-                             method='middle',
-                             desc='Computing turning rate'):
+
+    def compute_turning_rate(
+        self,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        method="middle",
+        desc="Computing turning rate",
+    ):
         """
         Computes the turning rate of tracks based on the change in coursing between points. This gets added
         as a "Turning Rate" column in the track data.
@@ -1816,7 +1939,7 @@ class Dataset:
         not the case, you should run the Dataset.compute_coursing function first.
 
         The method kwarg must be one of ['forward', 'middle', 'backward'] and corresponds to which pairs of
-        points to use for determining turning rate values, and how to fill the remaining point. 
+        points to use for determining turning rate values, and how to fill the remaining point.
 
         If 'forward', the turning rate at each point is calculated by the change in coursing from the current
         point to the next point. The first point on the track then gets filled with the value of the second point.
@@ -1825,9 +1948,9 @@ class Dataset:
         the value of the second last point.
 
         If 'middle', it uses an average of both and no filling is required.
-        
+
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1846,38 +1969,44 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #assert method
-        msg = 'method must be backward, middle, or forward'
-        assert method in ['backward','middle','forward'], msg
-        #set out path
+        # assert method
+        msg = "method must be backward, middle, or forward"
+        assert method in ["backward", "middle", "forward"], msg
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #recompute in parallel
-        utils.pool_caller(geometry.compute_turning_rate,
-                          (method, out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)       
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # recompute in parallel
+        utils.pool_caller(
+            geometry.compute_turning_rate,
+            (method, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = self.meta.copy()
-        meta['Turning Rate'] = 'degrees/sec'
+        meta["Turning Rate"] = "degrees/sec"
         self = self._update_meta(out_path, meta)
         return self
 
-    def compute_speed(self, 
-                      agents=None,
-                      tracks=None, 
-                      ncores=1, 
-                      out_path=None,
-                      method='middle',
-                      desc='Computing speed'):
+    def compute_speed(
+        self,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        method="middle",
+        desc="Computing speed",
+    ):
         """
         Computes the speed of tracks based on the distance/time between points. This gets added
         as a "Speed" column in the track data.
 
         The method kwarg must be one of ['forward', 'middle', 'backward'] and corresponds to which pairs of
-        points to use for determining speed values, and how to fill the remaining point. 
+        points to use for determining speed values, and how to fill the remaining point.
 
         If 'forward', the speed at each point is calculated by the change in distance/time from the current
         point to the next point. The first point on the track then gets filled with the value of the second point.
@@ -1886,9 +2015,9 @@ class Dataset:
         the value of the second last point.
 
         If 'middle', it uses an average of both and no filling is required.
-        
+
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1907,32 +2036,38 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #assert method
-        msg = 'method must be backward, middle, or forward'
-        assert method in ['backward','middle','forward'], msg
-        #set out path
+        # assert method
+        msg = "method must be backward, middle, or forward"
+        assert method in ["backward", "middle", "forward"], msg
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #recompute in parallel
-        utils.pool_caller(geometry.compute_speed,
-                          (method, out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)  
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # recompute in parallel
+        utils.pool_caller(
+            geometry.compute_speed,
+            (method, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = self.meta.copy()
-        meta['Speed'] = f"{meta['X']}/second"
+        meta["Speed"] = f"{meta['X']}/second"
         self = self._update_meta(out_path, meta)
         return self
 
-    def compute_acceleration(self, 
-                             agents=None,
-                             tracks=None, 
-                             ncores=1, 
-                             out_path=None,
-                             method='middle',
-                             desc='Computing acceleration'):
+    def compute_acceleration(
+        self,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        method="middle",
+        desc="Computing acceleration",
+    ):
         """
         Computes the acceleration of tracks based on the distance/time between points. This gets added
         as an "Acceleration" column in the track data.
@@ -1941,7 +2076,7 @@ class Dataset:
         not the case, you should run the Dataset.compute_speed method first.
 
         The method kwarg must be one of ['forward', 'middle', 'backward'] and corresponds to which pairs of
-        points to use for determining acceleration values, and how to fill the remaining point. 
+        points to use for determining acceleration values, and how to fill the remaining point.
 
         If 'forward', the acceleration at each point is calculated by the change in speed from the current
         point to the next point. The first point on the track then gets filled with the value of the second point.
@@ -1950,9 +2085,9 @@ class Dataset:
         the value of the second last point.
 
         If 'middle', it uses an average of both and no filling is required.
-        
+
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -1971,36 +2106,107 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #assert method
-        msg = 'method must be backward, middle, or forward'
-        assert method in ['backward','middle','forward'], msg
-        #set out path
+        # assert method
+        msg = "method must be backward, middle, or forward"
+        assert method in ["backward", "middle", "forward"], msg
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #recompute in parallel
-        utils.pool_caller(geometry.compute_acceleration,
-                          (out_path, method),
-                          pkl_groups,
-                          desc,
-                          ncores)  
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # recompute in parallel
+        utils.pool_caller(
+            geometry.compute_acceleration,
+            (out_path, method),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = self.meta.copy()
-        meta['Acceleration'] = f"{meta['Speed']}/second"
+        meta["Acceleration"] = f"{meta['Speed']}/second"
         self = self._update_meta(out_path, meta)
         return self
 
-    def compute_distance_travelled(self, 
-                                   relative=False,
-                                   agents=None,
-                                   tracks=None, 
-                                   ncores=1, 
-                                   out_path=None,
-                                   desc='Computing distance travelled along tracks'):
+    def compute_timestep(
+        self,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        method="backward",
+        desc="Computing timestep size",
+    ) -> "Dataset":
+        """
+        Computes the timestep size based on the timestamp of consequtive points in a track. This gets added
+        as an "Timestep" column in the track data.
+
+        The method kwarg must be one of ['forward', 'backward'] and corresponds to which pairs of
+        points to use for calculating timestep values, and how to fill the remaining point.
+
+        If 'forward', the timestep size at each point is calculated by comparing its timestamp to the next point.
+        The first point on the track then gets filled a np.nan value.
+
+        If 'backward', it uses the current point and the previous point, and the last point gets filled with
+        np.nan.
+
+        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
+        in the original self.data_path location.
+
+        Args:
+            agents (list, optional): A list of agent IDs for which the timestep will be computed. If None, the timestep
+                                    will be computed for all agents available in the dataset.
+            tracks (list, optional): A list of specific track IDs for which to compute the timestep. This allows
+                                    focusing on particular tracks of interest. If None, and agents are specified,
+                                    the timestep is computed for all tracks associated with the specified agents.
+                                    If both are None, the timestep is computed for all tracks in the dataset.
+            ncores (int, optional): The number of processing cores to use for the computation. Defaults to 1.
+            out_path (str, optional): The file path where the results of the timestep computation should be saved.
+                                    If None, it uses the current data_path.
+            method (str, optional): The method used to compute the timestep, must be one of ['forward', 'backward']. Defaults to 'backward'.
+            desc (str, optional): A brief description of the timestep computation operation. Defaults to 'Computing timestep'.
+
+        Returns:
+            self: The Dataset instance.
+        """
+        # assert method
+        msg = "method must be backward, or forward"
+        assert method in ["backward", "forward"], msg
+        # set out path
+        out_path = self._set_out_path(out_path)
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # recompute in parallel
+        utils.pool_caller(
+            geometry.compute_timestep,
+            (out_path, method),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
+        meta = self.meta.copy()
+        meta["Timestep"] = "second"
+        self = self._update_meta(out_path, meta)
+        return self
+
+    def compute_distance_travelled(
+        self,
+        relative=False,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Computing distance travelled along tracks",
+    ):
         """
         Computes the total distance travelled along each track. This gets added
         as a "Distance Travelled" column in the track data.
-        
+
         The computation can be done in an absolute sense which captures the true distance travelled
         along the track. Or, it can be done relatively where every track is normalized to travel from 0-1.
 
@@ -2018,47 +2224,53 @@ class Dataset:
                                 along tracks'.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #recompute in parallel
-        utils.pool_caller(geometry.compute_distance_travelled,
-                          (out_path, relative),
-                          pkl_groups,
-                          desc,
-                          ncores)  
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # recompute in parallel
+        utils.pool_caller(
+            geometry.compute_distance_travelled,
+            (out_path, relative),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = self.meta.copy()
-        meta['Distance Travelled'] = meta['X']
+        meta["Distance Travelled"] = meta["X"]
         self = self._update_meta(out_path, meta)
         return self
 
-    def compute_radius_of_curvature(self, 
-                                   agents=None,
-                                   tracks=None, 
-                                   ncores=1, 
-                                   out_path=None,
-                                   desc='Computing radius of curvature'):
+    def compute_radius_of_curvature(
+        self,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Computing radius of curvature",
+    ):
         """
         Computes the radius of curvature for each point along tracks. This gets added
         as a "Radius of Curvature" column in the track data.
 
         This is very useful for isolating parts of tracks where agents are turning.
-        
-        This algorithm works by looking at points along each track, along with the 2 neighbouring points. 
+
+        This algorithm works by looking at points along each track, along with the 2 neighbouring points.
         These 3 points are then used to construct a circle, and the radius of this circle is the Radius of Curvature
-        at the middle point. Naturally, this results in a nan value for the first and last points of the tracks, 
+        at the middle point. Naturally, this results in a nan value for the first and last points of the tracks,
         since they only have 1 neighbour.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -2075,39 +2287,45 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #recompute in parallel
-        utils.pool_caller(geometry.compute_radius_of_curvature,
-                          (out_path,),
-                          pkl_groups,
-                          desc,
-                          ncores)  
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # recompute in parallel
+        utils.pool_caller(
+            geometry.compute_radius_of_curvature,
+            (out_path,),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = self.meta.copy()
-        meta['Radius of Curvature'] = meta['X']
+        meta["Radius of Curvature"] = meta["X"]
         self = self._update_meta(out_path, meta)
         return self
 
-    def compute_sinuosity(self, 
-                          agents=None,
-                          tracks=None, 
-                          ncores=1, 
-                          out_path=None,
-                          window=3,
-                          desc='Computing sinuosity'):
+    def compute_sinuosity(
+        self,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        window=3,
+        desc="Computing sinuosity",
+    ):
         """
         Computes the sinuosity for each point along tracks. This gets added as a "Sinuosity" column in the track data.
-        
+
         This algorithm works by looking at a central middle point, as well as a user-defined window of points centered
         at this point. The sinuosity is then calculated as the ratio between total length and effective length
         (distance between start and end points) for the window of points. Naturally, this will result in nan values
         at the beginning and end of the track depending on how large the window is.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -2126,31 +2344,37 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #assert odd window number to be centered on each point
-        assert window%2 > 0, 'window must be an odd number'
-        #set out path
+        # assert odd window number to be centered on each point
+        assert window % 2 > 0, "window must be an odd number"
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #recompute in parallel
-        utils.pool_caller(geometry.compute_sinuosity,
-                          (out_path, window),
-                          pkl_groups,
-                          desc,
-                          ncores)  
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # recompute in parallel
+        utils.pool_caller(
+            geometry.compute_sinuosity,
+            (out_path, window),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = self.meta.copy()
-        meta['Sinuosity'] = 'non-dimensional'
+        meta["Sinuosity"] = "non-dimensional"
         self = self._update_meta(out_path, meta)
         return self
 
-    def smooth_corners(self, 
-                       refinements=2,
-                       agents=None,
-                       tracks=None, 
-                       ncores=1, 
-                       out_path=None,
-                       desc='Smoothing sharp corners'):
+    def smooth_corners(
+        self,
+        refinements=2,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Smoothing sharp corners",
+    ):
         """
         Smooths sharp corners/turns in tracks using a iterative weighted averaging technique.
 
@@ -2161,7 +2385,7 @@ class Dataset:
         Here, linear interpolation is used to fill any dynamic data at new points.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -2179,32 +2403,38 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(geometry.smooth_corners,
-                          (refinements, out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            geometry.smooth_corners,
+            (refinements, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-            
-    def decimate_tracks(self, 
-                        epsilon=1,
-                        agents=None,
-                        tracks=None, 
-                        ncores=1, 
-                        out_path=None,
-                        desc='Decimating tracks'):
+
+    def decimate_tracks(
+        self,
+        epsilon=1,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Decimating tracks",
+    ):
         """
-        Decimates track geometry using the Douglas-Peucker algorithm. 
+        Decimates track geometry using the Douglas-Peucker algorithm.
 
         https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm
-        
+
         Decimation is very useful for reducing the size of the dataset, while still
         maintaining an appropriate level of detail.
 
@@ -2212,56 +2442,62 @@ class Dataset:
         meters for UTM, etc.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
-            epsilon (float, optional): The tolerance for decimation, determining the minimum distance 
-                                    a point must have from a line segment connecting adjacent points 
-                                    to be retained. Defaults to 1, with units depending on the CRS 
+            epsilon (float, optional): The tolerance for decimation, determining the minimum distance
+                                    a point must have from a line segment connecting adjacent points
+                                    to be retained. Defaults to 1, with units depending on the CRS
                                     of the track data (e.g., meters or degrees).
-            agents (list, optional): A list of agent IDs for which tracks will be decimated. If None, 
-                                    the decimation process is applied to tracks associated with all 
+            agents (list, optional): A list of agent IDs for which tracks will be decimated. If None,
+                                    the decimation process is applied to tracks associated with all
                                     agents in the dataset.
-            tracks (list, optional): A list of specific track IDs to be decimated. This allows for 
-                                    selective decimation of tracks. If None, the operation applies 
-                                    to tracks related to the specified agents or all tracks if no 
+            tracks (list, optional): A list of specific track IDs to be decimated. This allows for
+                                    selective decimation of tracks. If None, the operation applies
+                                    to tracks related to the specified agents or all tracks if no
                                     agents are specified.
-            ncores (int, optional): The number of processing cores to use for the decimation operation. 
+            ncores (int, optional): The number of processing cores to use for the decimation operation.
                                     Defaults to 1.
-            out_path (str, optional): The file path where the dataset with decimated tracks should be saved. 
+            out_path (str, optional): The file path where the dataset with decimated tracks should be saved.
                                     If None, it assumes the current data_path.
             desc (str, optional): A brief description of the decimation operation. Defaults to 'Decimating tracks'.
 
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(geometry.decimate_tracks,
-                          (epsilon, out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            geometry.decimate_tracks,
+            (epsilon, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-       
-    def characteristic_tracks(self,
-                              stop_threshold=0.15,
-                              turn_threshold=22.5,
-                              min_distance=500,
-                              max_distance=20000,
-                              min_stop_duration=1800,
-                              agents=None,
-                              tracks=None, 
-                              ncores=1, 
-                              out_path=None,
-                              inplace=False,
-                              desc='Extracting characteristic tracks'):
+
+    def characteristic_tracks(
+        self,
+        stop_threshold=0.15,
+        turn_threshold=22.5,
+        min_distance=500,
+        max_distance=20000,
+        min_stop_duration=1800,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        inplace=False,
+        desc="Extracting characteristic tracks",
+    ):
         """
         Based on "Spatial Generalization and Aggregation of Massive Movement Data", Adrienko & Adrienko (2010).
 
@@ -2270,8 +2506,8 @@ class Dataset:
 
         Identifies and extracts characteristic tracks from existing tracks.
 
-        This method is useful for analyzing macroscopic behavior or movement patterns within track data, allowing for the 
-        identification of significant activities or navigation patterns based on parameters like stop duration, 
+        This method is useful for analyzing macroscopic behavior or movement patterns within track data, allowing for the
+        identification of significant activities or navigation patterns based on parameters like stop duration,
         turn angles, and travel distances.
 
         This method is also very useful for simplifying tracks to reduce dataset size, while maintaining an
@@ -2282,26 +2518,26 @@ class Dataset:
         True at characteristic points.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Here all spatial/speed kwargs are in the CRS units. I.e. degrees for geographic, meters for UTM, etc.
 
         Args:
             stop_threshold (float, optional): The speed threshold below which a movement is considered a stop. Defaults to 0.15.
-            turn_threshold (float, optional): The minimum change in direction (in degrees) considered a significant 
+            turn_threshold (float, optional): The minimum change in direction (in degrees) considered a significant
                                                 turn. Defaults to 22.5 degrees.
             min_distance (float, optional): The minimum allowable distance between characteristic points. Defaults to 500.
             max_distance (float, optional): The maximum allowable distance between characteristic points. Defaults to 20000.
-            min_stop_duration (int, optional): The minimum duration (in seconds) of a stop to be considered significant. 
+            min_stop_duration (int, optional): The minimum duration (in seconds) of a stop to be considered significant.
                                                 Defaults to 1800 seconds (30 minutes).
-            agents (list, optional): A list of agent IDs to be analyzed. If None, the analysis is applied across all 
+            agents (list, optional): A list of agent IDs to be analyzed. If None, the analysis is applied across all
                                         agents in the dataset.
-            tracks (list, optional): A list of specific track IDs to be analyzed. This allows for focusing on particular 
-                                        tracks of interest. If None, the operation applies to tracks related to the specified 
+            tracks (list, optional): A list of specific track IDs to be analyzed. This allows for focusing on particular
+                                        tracks of interest. If None, the operation applies to tracks related to the specified
                                         agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the analysis. Defaults to 1.
-            out_path (str, optional): The file path where the dataset with the extracted characteristic tracks should be saved. 
+            out_path (str, optional): The file path where the dataset with the extracted characteristic tracks should be saved.
                                         If None, it assumes the current data_path.
             inplace (bool, optional): Whether to modify the dataset in place, or add a Characteristic column.
                                       Defaults to False, indicating not modifying in place.
@@ -2310,63 +2546,71 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process in parallel
-        utils.pool_caller(geometry.characteristic_tracks,
-                          (stop_threshold,
-                           turn_threshold,
-                           min_distance,
-                           max_distance,
-                           min_stop_duration,
-                           out_path,
-                           inplace),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process in parallel
+        utils.pool_caller(
+            geometry.characteristic_tracks,
+            (
+                stop_threshold,
+                turn_threshold,
+                min_distance,
+                max_distance,
+                min_stop_duration,
+                out_path,
+                inplace,
+            ),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = self.meta.copy()
-        meta['Characteristic'] = 'Characteristic Points'
+        meta["Characteristic"] = "Characteristic Points"
         self = self._update_meta(out_path, meta)
         return self
-    
-    def simplify_stops(self, 
-                       stop_threshold=0.15, 
-                       min_stop_duration=1800,
-                       max_drift_distance=1000,
-                       agents=None,
-                       tracks=None, 
-                       ncores=1, 
-                       out_path=None,
-                       desc='Simplifying stops along tracks'):
+
+    def simplify_stops(
+        self,
+        stop_threshold=0.15,
+        min_stop_duration=1800,
+        max_drift_distance=1000,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Simplifying stops along tracks",
+    ):
         """
         Simplifies and reduces the number of points that define stop events along tracks.
 
         This can be useful for simplifying large amounts of unnecessary data into key
-        points such as start/end points, which maintain the critical information of the stop 
+        points such as start/end points, which maintain the critical information of the stop
         (e.g. duration). In particular, this has proved useful to simplify AIS vessel tracks
         where AIS transponders have been left on at a mooring location for an extended period of time.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
-        
+
         Here all spatial/speed kwargs are in the CRS units. I.e. degrees for geographic, meters for UTM, etc.
-        
+
         Args:
             stop_threshold (float, optional): The speed threshold below which a movement is considered a stop. Defaults to 0.15.
-            min_stop_duration (int, optional): The minimum duration (in seconds) of a stop to be considered significant. 
+            min_stop_duration (int, optional): The minimum duration (in seconds) of a stop to be considered significant.
                                                             Defaults to 1800 seconds (30 minutes).
             max_drift_distance (int, optional): The maximum allowable distance between stop points before an intermediate point
                                                 is maintained. Defaults to 1000.
-            agents (list, optional): A list of agent IDs for which stops will be simplified. If None, the simplification process 
+            agents (list, optional): A list of agent IDs for which stops will be simplified. If None, the simplification process
                                     is applied to stops associated with all agents in the dataset.
-            tracks (list, optional): A list of specific track IDs for which stops will be simplified. This allows for selective 
-                                    simplification of stops within certain tracks. If None, the operation applies to tracks related 
+            tracks (list, optional): A list of specific track IDs for which stops will be simplified. This allows for selective
+                                    simplification of stops within certain tracks. If None, the operation applies to tracks related
                                     to the specified agents or all tracks if no agents are specified.
-            ncores (int, optional): The number of processing cores to use for the simplification operation. Defaults to 1, 
+            ncores (int, optional): The number of processing cores to use for the simplification operation. Defaults to 1,
                                     implying serial processing. Utilizing more cores can speed up the process for large datasets.
             out_path (str, optional): The file path where the dataset with simplified stops should be saved. If None, it assumes
                                     the current data_path.
@@ -2375,46 +2619,49 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(geometry.simplify_stops,
-                          (stop_threshold,
-                           min_stop_duration,
-                           max_drift_distance,
-                           out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            geometry.simplify_stops,
+            (stop_threshold, min_stop_duration, max_drift_distance, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def imprint_geometry(self, 
-                         shape,
-                         agents=None,
-                         tracks=None, 
-                         ncores=1, 
-                         out_path=None,
-                         desc='Imprinting geometry into tracks'):
+
+    def imprint_geometry(
+        self,
+        shape,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Imprinting geometry into tracks",
+    ):
         """
-        Imprints a specified geometric shape onto track data. Shape must be a shapely LineString, 
+        Imprints a specified geometric shape onto track data. Shape must be a shapely LineString,
         MultiLineString, Polygon, or MultiPolygon. The shape must be in the same CRS as the data.
 
-        This is very useful for things like clipping tracks, isolating parts of tracks inside of polygons, 
+        This is very useful for things like clipping tracks, isolating parts of tracks inside of polygons,
         or getting an accurate estimate of time spent inside a polygon. This may also be useful if you simply
         want to add data to tracks at a very specific location for later use.
 
         Here, linear interpolation is used to fill any dynamic data at new points.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
-            shape: The geometric shape to be imprinted onto the tracks. Shape must be a shapely LineString, 
+            shape: The geometric shape to be imprinted onto the tracks. Shape must be a shapely LineString,
                   MultiLineString, Polygon, or MultiPolygon.
             agents (list, optional): A list of agent IDs whose tracks will be modified by the geometric shape.
                                     If None, the operation applies to all agents in the dataset.
@@ -2430,37 +2677,42 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #check input is valid
-        msg = 'geometry must be a shapely LineString, MultiLineString, Polygon, or MultiPolygon'
-        assert isinstance(shape, (LineString, 
-                                  MultiLineString, 
-                                  Polygon, 
-                                  MultiPolygon)), msg
+        # check input is valid
+        msg = "geometry must be a shapely LineString, MultiLineString, Polygon, or MultiPolygon"
+        assert isinstance(
+            shape, (LineString, MultiLineString, Polygon, MultiPolygon)
+        ), msg
         polylines = utils.prepare_polylines(shape)
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(geometry.imprint_geometry,
-                          (polylines, out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            geometry.imprint_geometry,
+            (polylines, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
 
-    def interpolate_raster(self,
-                           ras,
-                           name,
-                           agents=None,
-                           tracks=None,
-                           ncores=1,
-                           out_path=None,
-                           method='linear',
-                           meta='Raster Values',
-                           desc='Interpolating raster to tracks'):
+    def interpolate_raster(
+        self,
+        ras,
+        name,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        method="linear",
+        meta="Raster Values",
+        desc="Interpolating raster to tracks",
+    ):
         """
         Interpolates values from a raster onto the track points, effectively assigning raster-based
         values (e.g., elevation, temperature) to each point along the tracks. This method allows for the enrichment
@@ -2494,49 +2746,57 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #assert rasterio object
-        msg = 'raster must be a rasterio object'
+        # assert rasterio object
+        msg = "raster must be a rasterio object"
         assert isinstance(ras, rio.io.DatasetReader), msg
-        #assert same crs
-        msg = 'raster must have same CRS as Dataset'
-        assert pyproj.CRS(self.meta['CRS']).equals(ras.crs), msg
-        x,_ = ras.xy([0]*ras.shape[0],range(ras.shape[0]))
-        _,y = ras.xy(range(ras.shape[1]), [0]*ras.shape[1])
-        interp = RegularGridInterpolator((x,y), 
-                                         ras.read(1),
-                                         bounds_error=False,
-                                         fill_value=np.nan,
-                                         method=method)
-        #set out path
+        # assert same crs
+        msg = "raster must have same CRS as Dataset"
+        assert pyproj.CRS(self.meta["CRS"]).equals(ras.crs), msg
+        x, _ = ras.xy([0] * ras.shape[0], range(ras.shape[0]))
+        _, y = ras.xy(range(ras.shape[1]), [0] * ras.shape[1])
+        interp = RegularGridInterpolator(
+            (x, y),
+            ras.read(1),
+            bounds_error=False,
+            fill_value=np.nan,
+            method=method,
+        )
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(geometry.interpolate_raster,
-                          (interp, name, out_path),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            geometry.interpolate_raster,
+            (interp, name, out_path),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         _meta = self.meta.copy()
         _meta[name] = meta
         self = self._update_meta(out_path, _meta)
         return self
 
-    def encounters(self, #first ds
-                   dataset=None, #second ds
-                   distance=0.1, #in dataset CRS units
-                   time=3600, #seconds
-                   ncores=1, 
-                   tracks0=None, #tracks in first ds
-                   tracks1=None, #tracks in second ds
-                   data_cols=[],
-                   meta_cols=[],
-                   filter_min=False, #only keep closest encounter
-                   desc='Calculating spatiotemporal encounters'):
+    def encounters(
+        self,  # first ds
+        dataset=None,  # second ds
+        distance=0.1,  # in dataset CRS units
+        time=3600,  # seconds
+        ncores=1,
+        tracks0=None,  # tracks in first ds
+        tracks1=None,  # tracks in second ds
+        data_cols=[],
+        meta_cols=[],
+        filter_min=False,  # only keep closest encounter
+        desc="Calculating spatiotemporal encounters",
+    ):
         """
-        Calculates spatiotemporal encounters between two datasets. Identifies instances where tracks 
-        come within a specified distance of each other within certain difference in time. This function can be 
+        Calculates spatiotemporal encounters between two datasets. Identifies instances where tracks
+        come within a specified distance of each other within certain difference in time. This function can be
         used for analyzing interactions or proximities between tracks.
 
         By default, dataset=None is passed, which forces the second dataset to be the same as the first. Meaning,
@@ -2571,94 +2831,98 @@ class Dataset:
         Returns:
             pd.DataFrame: Pandas DataFrame containing spatiotemporal encounters, along with requested meta_cols and data_cols.
         """
-        #if no input, self encounters
+        # if no input, self encounters
         if dataset is None:
             dataset = self.copy()
-        assert self.meta['CRS'] == dataset.meta['CRS'], 'CRS does not match between Datasets'
-        #get the two track databases
+        assert (
+            self.meta["CRS"] == dataset.meta["CRS"]
+        ), "CRS does not match between Datasets"
+        # get the two track databases
         db1 = self.tracks
         db2 = dataset.tracks
-        #reduce databases
-        keepcols = ['Start Time',
-                    'End Time', 
-                    'File',
-                    'Agent ID']
+        # reduce databases
+        keepcols = ["Start Time", "End Time", "File", "Agent ID"]
         db1 = db1[keepcols]
         db2 = db2[keepcols]
         if tracks0 is not None:
             db1 = db1.loc[tracks0]
         if tracks1 is not None:
-            db2 = db2.loc[tracks1]   
-        #find overlapping unique pairs
-        _pairs = {'Track ID_0':[],
-                  'Track ID_1':[],
-                  'Agent ID_0':[],
-                  'Agent ID_1':[],
-                  'File_0':[],
-                  'File_1':[]}
+            db2 = db2.loc[tracks1]
+        # find overlapping unique pairs
+        _pairs = {
+            "Track ID_0": [],
+            "Track ID_1": [],
+            "Agent ID_0": [],
+            "Agent ID_1": [],
+            "File_0": [],
+            "File_1": [],
+        }
         for i in range(len(db1)):
             row = db1.iloc[i]
             tid1 = row.name
-            aid1 = row['Agent ID']
-            f1 = row['File']
-            start = row['Start Time']
-            end = row['End Time'] 
-            time_ids = np.nonzero((end >= db2['Start Time'] - pd.Timedelta(f'{time}s')).values 
-                                   & (db2['End Time'] + pd.Timedelta(f'{time}s') >= start).values)[0]
+            aid1 = row["Agent ID"]
+            f1 = row["File"]
+            start = row["Start Time"]
+            end = row["End Time"]
+            time_ids = np.nonzero(
+                (end >= db2["Start Time"] - pd.Timedelta(f"{time}s")).values
+                & (db2["End Time"] + pd.Timedelta(f"{time}s") >= start).values
+            )[0]
             tid2 = db2.index[time_ids]
-            aid2 = db2['Agent ID'].iloc[time_ids]
-            f2 = db2['File'].iloc[time_ids]
-            tid1 = [tid1]*len(tid2)
-            aid1 = [aid1]*len(aid2)
-            f1 = [f1]*len(f2)
-            _pairs['Track ID_0'].extend(tid1)
-            _pairs['Track ID_1'].extend(tid2)
-            _pairs['Agent ID_0'].extend(aid1)
-            _pairs['Agent ID_1'].extend(aid2)
-            _pairs['File_0'].extend(f1)
-            _pairs['File_1'].extend(f2)
+            aid2 = db2["Agent ID"].iloc[time_ids]
+            f2 = db2["File"].iloc[time_ids]
+            tid1 = [tid1] * len(tid2)
+            aid1 = [aid1] * len(aid2)
+            f1 = [f1] * len(f2)
+            _pairs["Track ID_0"].extend(tid1)
+            _pairs["Track ID_1"].extend(tid2)
+            _pairs["Agent ID_0"].extend(aid1)
+            _pairs["Agent ID_1"].extend(aid2)
+            _pairs["File_0"].extend(f1)
+            _pairs["File_1"].extend(f2)
         pairs = pd.DataFrame(_pairs)
-        #make a unique key for all pairs
-        pairs['sorted'] = pairs.apply(lambda x: '_'.join(sorted(x)), axis=1)
-        #delete duplicated keys
-        pairs = pairs.drop_duplicates(subset='sorted')
-        #delete self encounters
-        pairs = pairs[pairs['Track ID_0'] != pairs['Track ID_1']]
-        #simplify track ids for function
-        pairs['ID_0'] = pairs['Track ID_0'].apply(lambda x: x.rsplit('_')[-1])
-        pairs['ID_1'] = pairs['Track ID_1'].apply(lambda x: x.rsplit('_')[-1])
-        #group by agent id to reduce file opens
-        grouped = pairs.groupby(['Agent ID_0', 'Agent ID_1']).agg(list)
-        grouped['File_0'] = grouped['File_0'].apply(lambda x: x[0])
-        grouped['File_1'] = grouped['File_1'].apply(lambda x: x[0])
-        #process in parallel
-        rows = utils.pool_caller(geometry.encounters,
-                                 (grouped, 
-                                  distance, 
-                                  time, 
-                                  data_cols,
-                                  meta_cols,
-                                  filter_min),
-                                 list(range(len(grouped))),
-                                 desc,
-                                 ncores)
-        #convert to geodataframe and return
+        # make a unique key for all pairs
+        pairs["sorted"] = pairs.apply(lambda x: "_".join(sorted(x)), axis=1)
+        # delete duplicated keys
+        pairs = pairs.drop_duplicates(subset="sorted")
+        # delete self encounters
+        pairs = pairs[pairs["Track ID_0"] != pairs["Track ID_1"]]
+        # simplify track ids for function
+        pairs["ID_0"] = pairs["Track ID_0"].apply(lambda x: x.rsplit("_")[-1])
+        pairs["ID_1"] = pairs["Track ID_1"].apply(lambda x: x.rsplit("_")[-1])
+        # group by agent id to reduce file opens
+        grouped = pairs.groupby(["Agent ID_0", "Agent ID_1"]).agg(list)
+        grouped["File_0"] = grouped["File_0"].apply(lambda x: x[0])
+        grouped["File_1"] = grouped["File_1"].apply(lambda x: x[0])
+        # process in parallel
+        rows = utils.pool_caller(
+            geometry.encounters,
+            (grouped, distance, time, data_cols, meta_cols, filter_min),
+            list(range(len(grouped))),
+            desc,
+            ncores,
+        )
+        # convert to geodataframe and return
         rows = utils.flatten(rows)
-        if len(rows)>0:
-            out = gp.GeoDataFrame(rows, geometry='geometry', crs=self.meta['CRS'])
+        if len(rows) > 0:
+            out = gp.GeoDataFrame(
+                rows, geometry="geometry", crs=self.meta["CRS"]
+            )
         else:
             out = gp.GeoDataFrame()
-        return out  
-         
-    def intersections(self, 
-                      dataset=None, 
-                      time=3600, 
-                      ncores=1, 
-                      tracks0=None, 
-                      tracks1=None,                   
-                      data_cols=[],
-                      meta_cols=[],
-                      desc='Calculating intersections'):
+        return out
+
+    def intersections(
+        self,
+        dataset=None,
+        time=3600,
+        ncores=1,
+        tracks0=None,
+        tracks1=None,
+        data_cols=[],
+        meta_cols=[],
+        desc="Calculating intersections",
+    ):
         """
         Calculates intersections between two datasets. Identifies instances where tracks intersect with other tracks,
         within certain difference in time. This function can be  used for analyzing interactions or proximities between tracks.
@@ -2690,102 +2954,107 @@ class Dataset:
         Returns:
             pd.DataFrame: Pandas DataFrame containing intersections, along with requested meta_cols and data_cols.
         """
-        #if no input, self intersection
+        # if no input, self intersection
         if dataset is None:
             dataset = self.copy()
-        assert self.meta['CRS'] == dataset.meta['CRS'], 'CRS does not match between DataSets'
-        #get the two track databases
+        assert (
+            self.meta["CRS"] == dataset.meta["CRS"]
+        ), "CRS does not match between DataSets"
+        # get the two track databases
         db1 = self.tracks
         db2 = dataset.tracks
-        #reduce databases
-        keepcols = ['Start Time',
-                    'End Time', 
-                    'File',
-                    'Agent ID',
-                    'geometry']
+        # reduce databases
+        keepcols = ["Start Time", "End Time", "File", "Agent ID", "geometry"]
         db1 = db1[keepcols]
         db2 = db2[keepcols]
         if tracks0 is not None:
             db1 = db1.loc[tracks0]
         if tracks1 is not None:
-            db2 = db2.loc[tracks1]   
-        #find overlapping unique pairs
-        _pairs = {'Track ID_0':[],
-                  'Track ID_1':[],
-                  'Agent ID_0':[],
-                  'Agent ID_1':[],
-                  'File_0':[],
-                  'File_1':[]}
+            db2 = db2.loc[tracks1]
+        # find overlapping unique pairs
+        _pairs = {
+            "Track ID_0": [],
+            "Track ID_1": [],
+            "Agent ID_0": [],
+            "Agent ID_1": [],
+            "File_0": [],
+            "File_1": [],
+        }
         for i in range(len(db1)):
             row = db1.iloc[i]
             tid1 = row.name
-            aid1 = row['Agent ID']
-            f1 = row['File']
-            start = row['Start Time']
-            end = row['End Time'] 
-            bbox = row['geometry']
-            time_ids = np.nonzero((end >= db2['Start Time'] - pd.Timedelta(f'{time}s')).values 
-                                   & (db2['End Time'] + pd.Timedelta(f'{time}s') >= start).values)[0]
+            aid1 = row["Agent ID"]
+            f1 = row["File"]
+            start = row["Start Time"]
+            end = row["End Time"]
+            bbox = row["geometry"]
+            time_ids = np.nonzero(
+                (end >= db2["Start Time"] - pd.Timedelta(f"{time}s")).values
+                & (db2["End Time"] + pd.Timedelta(f"{time}s") >= start).values
+            )[0]
             space_ids = np.nonzero(db2.geometry.intersects(bbox).values)[0]
             all_ids = [id for id in space_ids if id in time_ids]
             tid2 = db2.index[all_ids]
-            aid2 = db2['Agent ID'].iloc[all_ids]
-            f2 = db2['File'].iloc[all_ids]
-            tid1 = [tid1]*len(tid2)
-            aid1 = [aid1]*len(aid2)
-            f1 = [f1]*len(f2)
-            _pairs['Track ID_0'].extend(tid1)
-            _pairs['Track ID_1'].extend(tid2)
-            _pairs['Agent ID_0'].extend(aid1)
-            _pairs['Agent ID_1'].extend(aid2)
-            _pairs['File_0'].extend(f1)
-            _pairs['File_1'].extend(f2)
+            aid2 = db2["Agent ID"].iloc[all_ids]
+            f2 = db2["File"].iloc[all_ids]
+            tid1 = [tid1] * len(tid2)
+            aid1 = [aid1] * len(aid2)
+            f1 = [f1] * len(f2)
+            _pairs["Track ID_0"].extend(tid1)
+            _pairs["Track ID_1"].extend(tid2)
+            _pairs["Agent ID_0"].extend(aid1)
+            _pairs["Agent ID_1"].extend(aid2)
+            _pairs["File_0"].extend(f1)
+            _pairs["File_1"].extend(f2)
         pairs = pd.DataFrame(_pairs)
-        #make a unique key for all pairs
-        pairs['sorted'] = pairs.apply(lambda x: '_'.join(sorted(x)), axis=1)
-        #delete duplicated keys
-        pairs = pairs.drop_duplicates(subset='sorted')
-        #delete self encounters
-        pairs = pairs[pairs['Track ID_0'] != pairs['Track ID_1']]
-        #simplify track ids for function
-        pairs['ID_0'] = pairs['Track ID_0'].apply(lambda x: x.rsplit('_')[-1])
-        pairs['ID_1'] = pairs['Track ID_1'].apply(lambda x: x.rsplit('_')[-1])
-        #group by agent id to reduce file opens
-        grouped = pairs.groupby(['Agent ID_0', 'Agent ID_1']).agg(list)
-        grouped['File_0'] = grouped['File_0'].apply(lambda x: x[0])
-        grouped['File_1'] = grouped['File_1'].apply(lambda x: x[0])
-        #process in parallel
-        rows = utils.pool_caller(geometry.intersections,
-                                 (grouped, 
-                                  time, 
-                                  data_cols,
-                                  meta_cols),
-                                 list(range(len(grouped))),
-                                 desc,
-                                 ncores)
-        #convert to geodataframe and return
+        # make a unique key for all pairs
+        pairs["sorted"] = pairs.apply(lambda x: "_".join(sorted(x)), axis=1)
+        # delete duplicated keys
+        pairs = pairs.drop_duplicates(subset="sorted")
+        # delete self encounters
+        pairs = pairs[pairs["Track ID_0"] != pairs["Track ID_1"]]
+        # simplify track ids for function
+        pairs["ID_0"] = pairs["Track ID_0"].apply(lambda x: x.rsplit("_")[-1])
+        pairs["ID_1"] = pairs["Track ID_1"].apply(lambda x: x.rsplit("_")[-1])
+        # group by agent id to reduce file opens
+        grouped = pairs.groupby(["Agent ID_0", "Agent ID_1"]).agg(list)
+        grouped["File_0"] = grouped["File_0"].apply(lambda x: x[0])
+        grouped["File_1"] = grouped["File_1"].apply(lambda x: x[0])
+        # process in parallel
+        rows = utils.pool_caller(
+            geometry.intersections,
+            (grouped, time, data_cols, meta_cols),
+            list(range(len(grouped))),
+            desc,
+            ncores,
+        )
+        # convert to geodataframe and return
         rows = utils.flatten(rows)
-        if len(rows)>0:
-            out = gp.GeoDataFrame(rows, geometry='geometry', crs=self.meta['CRS'])
+        if len(rows) > 0:
+            out = gp.GeoDataFrame(
+                rows, geometry="geometry", crs=self.meta["CRS"]
+            )
         else:
             out = gp.GeoDataFrame()
-        return out   
-    
-    def proximity_to_object(self, 
-                            shapely_object, 
-                            agents=None,
-                            tracks=None, 
-                            data_cols=[],
-                            meta_cols=[],
-                            ncores=1, 
-                            desc='Calculating proximities to object'):
+        return out
+
+    def proximity_to_object(
+        self,
+        shapely_object,
+        agents=None,
+        tracks=None,
+        data_cols=[],
+        meta_cols=[],
+        ncores=1,
+        desc="Calculating proximities to object",
+    ):
         """
         Calculates the minimum proximity of tracks to a specified geometric object. This object can be a
         shapely Point, MultiPoint, LineString, MultiLineString, Polygon, or MultiPolygon. It can also be
         a Nx2 numpy array containing x,y points that represent the former.
-         
-        The minimum proxixity between tracks and the object may not necessarily be points that fall on either of 
-        the original shapes. For example, if the object is a point, the closest proximity may be somewhere in the 
+
+        The minimum proxixity between tracks and the object may not necessarily be points that fall on either of
+        the original shapes. For example, if the object is a point, the closest proximity may be somewhere in the
         middle of one of the track's segments. This is similar to the shapely.ops.nearest_points:
 
         https://shapely.readthedocs.io/en/stable/manual.html#shapely.ops.nearest_points
@@ -2807,37 +3076,43 @@ class Dataset:
         Returns:
             DataFrame: A pandas DataFrame containing the minimum proximities, along with the requested meta_cols and data_cols.
         """
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #prepare geometry
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # prepare geometry
         shapes = utils.prepare_polylines(shapely_object)
-        #get proximities in parallel
-        rows = utils.pool_caller(geometry.proximity_to_object,
-                                 (shapes, data_cols, meta_cols),
-                                 pkl_groups,
-                                 desc,
-                                 ncores)
-        #flatten and return
+        # get proximities in parallel
+        rows = utils.pool_caller(
+            geometry.proximity_to_object,
+            (shapes, data_cols, meta_cols),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # flatten and return
         rows = utils.flatten(rows)
         out = pd.DataFrame(rows)
         return out
-    
-    def proximities(self,
-                    dataset=None,
-                    tracks0=None, 
-                    tracks1=None,
-                    data_cols=[],
-                    meta_cols=[],
-                    ncores=1, 
-                    bins=None, 
-                    relative=False,
-                    desc='Calculating track proximities'):
+
+    def proximities(
+        self,
+        dataset=None,
+        tracks0=None,
+        tracks1=None,
+        data_cols=[],
+        meta_cols=[],
+        ncores=1,
+        bins=None,
+        relative=False,
+        desc="Calculating track proximities",
+    ):
         """
         ***Note, this method assumes Datset.resample_time_global has already been run. If the tracks aren't on the same
         time axis, this will not work***
 
-        Calculates proximities between tracks. This analysis can help identify close encounters, common pathways, 
-        or general spatiotemporal relationships between moving entities represented by the tracks. 
+        Calculates proximities between tracks. This analysis can help identify close encounters, common pathways,
+        or general spatiotemporal relationships between moving entities represented by the tracks.
 
         By default, dataset=None is passed, which forces the second dataset to be the same as the first. Meaning,
         the default is to find the proximity of tracks inside the same Dataset; this is likely the most common application.
@@ -2845,7 +3120,7 @@ class Dataset:
         By passing a list of meta_cols or data_cols, you can also maintain metadata about the interactions (e.g. speed, coursing)
         which can facilitate more complex analyses with the data.
 
-        If bins is left as None, the output will be the closest point of approach (CPA) between each pair of tracks. 
+        If bins is left as None, the output will be the closest point of approach (CPA) between each pair of tracks.
 
         If bins is not None, it must be a list of distance bins. Then, the output will be the amount of time spent
         in each distance between, for each pair of tracks.
@@ -2876,111 +3151,118 @@ class Dataset:
         Returns:
             DataFrame: A pandas DataFrame containing the proximity output, depending on the value of bins and relative kwargs.
         """
-        print('Proximity analysis assumes that self.resample_time_global has already been run, '\
-            'if not the results will be invalid or the function may fail')
-        #if no input, self encounters
+        print(
+            "Proximity analysis assumes that self.resample_time_global has already been run, "
+            "if not the results will be invalid or the function may fail"
+        )
+        # if no input, self encounters
         if dataset is None:
             dataset = self.copy()
-        assert self.meta['CRS'] == dataset.meta['CRS'], 'CRS does not match between Datasets'
-        #ensure relative is False if no bins
+        assert (
+            self.meta["CRS"] == dataset.meta["CRS"]
+        ), "CRS does not match between Datasets"
+        # ensure relative is False if no bins
         if bins is None:
             relative = False
-        #get the two track databases
+        # get the two track databases
         db1 = self.tracks
         db2 = dataset.tracks
-        #reduce databases
-        keepcols = ['Start Time',
-                    'End Time', 
-                    'File',
-                    'Agent ID']
+        # reduce databases
+        keepcols = ["Start Time", "End Time", "File", "Agent ID"]
         db1 = db1[keepcols]
         db2 = db2[keepcols]
         if tracks0 is not None:
             db1 = db1.loc[tracks0]
         if tracks1 is not None:
-            db2 = db2.loc[tracks1]   
-        #find overlapping unique pairs
-        _pairs = {'Track ID_0':[],
-                  'Track ID_1':[],
-                  'Agent ID_0':[],
-                  'Agent ID_1':[],
-                  'File_0':[],
-                  'File_1':[]}
+            db2 = db2.loc[tracks1]
+        # find overlapping unique pairs
+        _pairs = {
+            "Track ID_0": [],
+            "Track ID_1": [],
+            "Agent ID_0": [],
+            "Agent ID_1": [],
+            "File_0": [],
+            "File_1": [],
+        }
         for i in range(len(db1)):
             row = db1.iloc[i]
             tid1 = row.name
-            aid1 = row['Agent ID']
-            f1 = row['File']
-            start = row['Start Time']
-            end = row['End Time'] 
-            time_ids = np.nonzero((end >= db2['Start Time']).values 
-                                   & (db2['End Time'] >= start).values)[0]
+            aid1 = row["Agent ID"]
+            f1 = row["File"]
+            start = row["Start Time"]
+            end = row["End Time"]
+            time_ids = np.nonzero(
+                (end >= db2["Start Time"]).values
+                & (db2["End Time"] >= start).values
+            )[0]
             tid2 = db2.index[time_ids]
-            aid2 = db2['Agent ID'].iloc[time_ids]
-            f2 = db2['File'].iloc[time_ids]
-            tid1 = [tid1]*len(tid2)
-            aid1 = [aid1]*len(aid2)
-            f1 = [f1]*len(f2)
-            _pairs['Track ID_0'].extend(tid1)
-            _pairs['Track ID_1'].extend(tid2)
-            _pairs['Agent ID_0'].extend(aid1)
-            _pairs['Agent ID_1'].extend(aid2)
-            _pairs['File_0'].extend(f1)
-            _pairs['File_1'].extend(f2)
+            aid2 = db2["Agent ID"].iloc[time_ids]
+            f2 = db2["File"].iloc[time_ids]
+            tid1 = [tid1] * len(tid2)
+            aid1 = [aid1] * len(aid2)
+            f1 = [f1] * len(f2)
+            _pairs["Track ID_0"].extend(tid1)
+            _pairs["Track ID_1"].extend(tid2)
+            _pairs["Agent ID_0"].extend(aid1)
+            _pairs["Agent ID_1"].extend(aid2)
+            _pairs["File_0"].extend(f1)
+            _pairs["File_1"].extend(f2)
         pairs = pd.DataFrame(_pairs)
-        #make a unique key for all pairs
-        pairs['sorted'] = pairs.apply(lambda x: '_'.join(sorted(x)), axis=1)
-        #delete duplicated keys
-        pairs = pairs.drop_duplicates(subset='sorted')
-        #delete self encounters
-        pairs = pairs[pairs['Track ID_0'] != pairs['Track ID_1']]
-        #simplify track ids for function
-        pairs['ID_0'] = pairs['Track ID_0'].apply(lambda x: x.rsplit('_')[-1])
-        pairs['ID_1'] = pairs['Track ID_1'].apply(lambda x: x.rsplit('_')[-1])
-        #group by agent id to reduce file opens
-        grouped = pairs.groupby(['Agent ID_0', 'Agent ID_1']).agg(list)
-        grouped['File_0'] = grouped['File_0'].apply(lambda x: x[0])
-        grouped['File_1'] = grouped['File_1'].apply(lambda x: x[0])
-        #process in parallel
-        rows = utils.pool_caller(geometry.proximities,
-                                 (grouped,
-                                  bins,
-                                  relative,
-                                  data_cols,
-                                  meta_cols),
-                                 list(range(len(grouped))),
-                                 desc,
-                                 ncores)
-        #convert to dataframe
+        # make a unique key for all pairs
+        pairs["sorted"] = pairs.apply(lambda x: "_".join(sorted(x)), axis=1)
+        # delete duplicated keys
+        pairs = pairs.drop_duplicates(subset="sorted")
+        # delete self encounters
+        pairs = pairs[pairs["Track ID_0"] != pairs["Track ID_1"]]
+        # simplify track ids for function
+        pairs["ID_0"] = pairs["Track ID_0"].apply(lambda x: x.rsplit("_")[-1])
+        pairs["ID_1"] = pairs["Track ID_1"].apply(lambda x: x.rsplit("_")[-1])
+        # group by agent id to reduce file opens
+        grouped = pairs.groupby(["Agent ID_0", "Agent ID_1"]).agg(list)
+        grouped["File_0"] = grouped["File_0"].apply(lambda x: x[0])
+        grouped["File_1"] = grouped["File_1"].apply(lambda x: x[0])
+        # process in parallel
+        rows = utils.pool_caller(
+            geometry.proximities,
+            (grouped, bins, relative, data_cols, meta_cols),
+            list(range(len(grouped))),
+            desc,
+            ncores,
+        )
+        # convert to dataframe
         if relative:
-            out = pd.concat([pd.DataFrame(r) for r in rows]).reset_index(drop=True)
-            out = out.groupby('Time').agg(max).reset_index()
+            out = pd.concat([pd.DataFrame(r) for r in rows]).reset_index(
+                drop=True
+            )
+            out = out.groupby("Time").agg(max).reset_index()
         else:
             rows = utils.flatten(rows)
             out = pd.DataFrame(rows)
         return out
-    
-    def lateral_distribution(self,
-                             start,
-                             end,
-                             split=True,
-                             spacing=100,
-                             n_slices=0,
-                             agents=None,
-                             tracks=None,
-                             ncores=1,
-                             polygon=None,
-                             density=True,
-                             bins=100,
-                             meta_cols=[],
-                             data_cols=[],
-                             desc='Calculating lateral distributions at slices'):
+
+    def lateral_distribution(
+        self,
+        start,
+        end,
+        split=True,
+        spacing=100,
+        n_slices=0,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        polygon=None,
+        density=True,
+        bins=100,
+        meta_cols=[],
+        data_cols=[],
+        desc="Calculating lateral distributions at slices",
+    ):
         """
         Analyzes the lateral distribution of tracks across specified slices/cross-sections of the data.
-         his method can also split tracks going to/from the direction along start to end to separate 
+         his method can also split tracks going to/from the direction along start to end to separate
         opposing "lanes" of traffic.
-        
-        Slices are taken along a line from start to end, with either n_slices or spacing defining where the slices fall. 
+
+        Slices are taken along a line from start to end, with either n_slices or spacing defining where the slices fall.
         You can specify the lateral distribution bin width, and whether to return a relative (0-1) or absolute probability
         distribution function.
 
@@ -3013,75 +3295,84 @@ class Dataset:
         Returns:
             DataFrame: A pandas DataFrame containing the distribution data across slices, along with the requested meta_cols and data_cols.
         """
-        #length/slope of arc
-        dist = (np.diff(np.array([start, end]), axis=0)**2).sum()**0.5
-        dy, dx = ((end[1] - start[1])/dist , (end[0] - start[0])/dist)
-        #longitudinal slice locations
-        long, xy = utils.longitudinal_slices(start, 
-                                             end, 
-                                             n_slices, 
-                                             spacing, 
-                                             dist)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process in parallel
-        dfs = utils.pool_caller(geometry.lateral_distribution,
-                                (long, xy, dy, dx, meta_cols, data_cols),
-                                pkl_groups,
-                                desc,
-                                ncores)
-        #flatten and turn into dataframe
-        df = pd.concat([_df for _df in dfs if len(_df)>0]).reset_index(drop=True)
-        #clip to polygon
+        # length/slope of arc
+        dist = (np.diff(np.array([start, end]), axis=0) ** 2).sum() ** 0.5
+        dy, dx = ((end[1] - start[1]) / dist, (end[0] - start[0]) / dist)
+        # longitudinal slice locations
+        long, xy = utils.longitudinal_slices(
+            start, end, n_slices, spacing, dist
+        )
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process in parallel
+        dfs = utils.pool_caller(
+            geometry.lateral_distribution,
+            (long, xy, dy, dx, meta_cols, data_cols),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # flatten and turn into dataframe
+        df = pd.concat([_df for _df in dfs if len(_df) > 0]).reset_index(
+            drop=True
+        )
+        # clip to polygon
         if polygon is not None:
             polygon, edges = utils.format_polygon(polygon)
-            mask = np.logical_or(*inpoly2(df[['TrackX', 'TrackY']].values, 
-                                          polygon, 
-                                          edges))
+            mask = np.logical_or(
+                *inpoly2(df[["TrackX", "TrackY"]].values, polygon, edges)
+            )
             df = df.loc[mask]
-        #groupby
+        # groupby
         if split:
-            grouper = ['Longitudinal Distance', 'Direction']
+            grouper = ["Longitudinal Distance", "Direction"]
         else:
-            grouper = ['Longitudinal Distance']
+            grouper = ["Longitudinal Distance"]
         grouped = df.groupby(grouper)[df.columns].agg(list)
-        #drop and format couple columns
-        grouped.drop(columns=['Longitudinal Distance',
-                              'Direction'], inplace=True)
-        grouped['SliceX'] = grouped['SliceX'].apply(lambda x: x[0])
-        grouped['SliceY'] = grouped['SliceY'].apply(lambda x: x[0])
-        #get global min/max
-        global_min = grouped['Lateral Distance'].explode().min()
-        global_max = grouped['Lateral Distance'].explode().max()
-        #create global bin edges and add to df
+        # drop and format couple columns
+        grouped.drop(
+            columns=["Longitudinal Distance", "Direction"], inplace=True
+        )
+        grouped["SliceX"] = grouped["SliceX"].apply(lambda x: x[0])
+        grouped["SliceY"] = grouped["SliceY"].apply(lambda x: x[0])
+        # get global min/max
+        global_min = grouped["Lateral Distance"].explode().min()
+        global_max = grouped["Lateral Distance"].explode().max()
+        # create global bin edges and add to df
         edges = utils.range_to_edges(global_min, global_max, bins)
-        grouped['Bins'] = [edges]*len(grouped)
-        #add frequency
-        grouped['Frequency'] = grouped.apply(lambda row: np.histogram(row['Lateral Distance'],
-                                                                      bins=row['Bins'],
-                                                                      density=False)[0], 
-                                             axis=1)
-        #if density, divide by total number of entries
+        grouped["Bins"] = [edges] * len(grouped)
+        # add frequency
+        grouped["Frequency"] = grouped.apply(
+            lambda row: np.histogram(
+                row["Lateral Distance"], bins=row["Bins"], density=False
+            )[0],
+            axis=1,
+        )
+        # if density, divide by total number of entries
         if density:
-            grouped['Frequency'] /= grouped['Lateral Distance'].apply(len)
-        #return
+            grouped["Frequency"] /= grouped["Lateral Distance"].apply(len)
+        # return
         return grouped
-    
-    def time_in_polygon(self, 
-                        polygon,
-                        agents=None,
-                        tracks=None,
-                        meta_cols=[],
-                        data_cols=[],
-                        desc='Computing time spent in polygon',
-                        ncores=1):
+
+    def time_in_polygon(
+        self,
+        polygon,
+        agents=None,
+        tracks=None,
+        meta_cols=[],
+        data_cols=[],
+        desc="Computing time spent in polygon",
+        ncores=1,
+    ):
         """
         Computes the time spent and distance travelled by tracks inside a specified polygonal area. This function is useful
         for analyzing spatial usage, such as habitat utilization, restricted area compliance, or general movement patterns
         within specific geographic boundaries. The analysis can help identify which agents or tracks spend time in the
         area of interest and quantify that time.
 
-        This is best used in conjunction with Dataset.imprint_geometry, as it can imprint the polygon outline into 
+        This is best used in conjunction with Dataset.imprint_geometry, as it can imprint the polygon outline into
         the actual tracks, thereby making the time spent and distance travelled estimates more accurate.
 
         The polygon can be a shapely Polygon, or Nx2 numpy defining a polygon.
@@ -3106,37 +3397,43 @@ class Dataset:
             DataFrame: A pandas DataFrame containing the calculated times spent and distances travelled within the polygon
                     for each track, along with any specified meta_cols and data_cols.
         """
-        #get polygon
+        # get polygon
         polygon, edges = utils.format_polygon(polygon)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #compute in parallel
-        rows = utils.pool_caller(geometry.time_in_polygon,
-                                (polygon, edges, meta_cols, data_cols),
-                                pkl_groups,
-                                desc,
-                                ncores)
-        #flatten and turn into dataframe
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # compute in parallel
+        rows = utils.pool_caller(
+            geometry.time_in_polygon,
+            (polygon, edges, meta_cols, data_cols),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # flatten and turn into dataframe
         rows = utils.flatten(rows)
         df = pd.DataFrame(rows)
         return df
-    
-    def generate_flow_map(self,
-                          polygons,
-                          characteristic_col=None,
-                          flow_col='Graph Node',
-                          agents=None,
-                          tracks=None,
-                          ncores=1,
-                          desc='Generating flow map from polygons'):
+
+    def generate_flow_map(
+        self,
+        polygons,
+        characteristic_col=None,
+        flow_col="Graph Node",
+        agents=None,
+        tracks=None,
+        ncores=1,
+        desc="Generating flow map from polygons",
+    ):
         """
         Generates a flow map based on movement or connectivity between specified polygonal areas. This function is
         useful for visualizing movement patterns, such as migration routes, traffic flows, or general movements of
         agents through different regions. The flow map can highlight areas of high connectivity or movement concentration,
         providing insights into spatial dynamics within the dataset from a macroscopic perspective.
 
-        This method assumes that you have already ran the Dataset.classify_in_polygons method to classify the 
-        tracks inside the polygons GeoDataFrame. The flow_col kwarg is the column that was produced when running 
+        This method assumes that you have already ran the Dataset.classify_in_polygons method to classify the
+        tracks inside the polygons GeoDataFrame. The flow_col kwarg is the column that was produced when running
         Dataset.classify_in_polygons.
 
         This method works by collecting all of the movements from polygon to polygon in the track data. Then, the movements
@@ -3165,56 +3462,61 @@ class Dataset:
             GeoDataFrame: A geopandas GeoDataFrame containing LineStrings representing the unique edges of the flow map,
                          along with their volume.
         """
-        #make sure it is proper format
-        msg = 'Polygons must be gp.GeoDataFrame with Code, X, Y columns'
+        # make sure it is proper format
+        msg = "Polygons must be gp.GeoDataFrame with Code, X, Y columns"
         assert isinstance(polygons, gp.GeoDataFrame), msg
-        assert all([c in polygons.columns for c in ['Code','X','Y']]), msg
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #compute in parallel
-        rows = utils.pool_caller(geometry.generate_flow_map,
-                                (characteristic_col, 
-                                 flow_col),
-                                pkl_groups,
-                                desc,
-                                ncores)
-        #flatten and convert to dataframe
+        assert all([c in polygons.columns for c in ["Code", "X", "Y"]]), msg
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # compute in parallel
+        rows = utils.pool_caller(
+            geometry.generate_flow_map,
+            (characteristic_col, flow_col),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # flatten and convert to dataframe
         rows = utils.flatten(rows)
         df = pd.DataFrame(rows)
-        df = df.groupby(['Start', 'End']).agg(list)
-        df['Volume'] = df['Track ID'].apply(len)
-        #add the linestrings
-        keys = polygons['Code'].values
-        vals = polygons[['X','Y']].values
+        df = df.groupby(["Start", "End"]).agg(list)
+        df["Volume"] = df["Track ID"].apply(len)
+        # add the linestrings
+        keys = polygons["Code"].values
+        vals = polygons[["X", "Y"]].values
         points = dict(zip(keys, vals))
         geo = []
         for idx in df.index:
             line = LineString([points[idx[0]], points[idx[1]]])
             geo.append(line)
-        #turn to gdf
+        # turn to gdf
         gdf = gp.GeoDataFrame(df, geometry=geo, crs=polygons.crs)
-        #add some properties
-        gdf['Length'] = gdf.geometry.length
+        # add some properties
+        gdf["Length"] = gdf.geometry.length
         dx = gdf.geometry.apply(lambda x: x.coords[-1][0] - x.coords[0][0])
         dy = gdf.geometry.apply(lambda x: x.coords[-1][1] - x.coords[0][1])
-        gdf['Direction'] = np.degrees(np.arctan2(dx, dy)) % 360
+        gdf["Direction"] = np.degrees(np.arctan2(dx, dy)) % 360
         return gdf.reset_index()
 
-    def reduce_to_flow_map(self,
-                          polygons,
-                          characteristic_col=None,
-                          flow_col='Graph Node',
-                          agents=None,
-                          tracks=None,
-                          ncores=1,
-                          out_path=None,
-                          desc='Generating flow map from polygons'):
+    def reduce_to_flow_map(
+        self,
+        polygons,
+        characteristic_col=None,
+        flow_col="Graph Node",
+        agents=None,
+        tracks=None,
+        ncores=1,
+        out_path=None,
+        desc="Generating flow map from polygons",
+    ):
         """
         This works the same way as Dataset.generate_flow_map, but instead the tracks are actually
         reduced to their flow map representation.
 
-        This method assumes that you have already ran the Dataset.classify_in_polygons method to classify the 
-        tracks inside the polygons GeoDataFrame. The flow_col kwarg is the column that was produced when running 
+        This method assumes that you have already ran the Dataset.classify_in_polygons method to classify the
+        tracks inside the polygons GeoDataFrame. The flow_col kwarg is the column that was produced when running
         Dataset.classify_in_polygons.
 
         This method works by routing each track through the polygons using the flow_col data, and then reducing
@@ -3240,55 +3542,58 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #make sure it is proper format
-        msg = 'Polygons must be gp.GeoDataFrame with Code, X, Y columns'
+        # make sure it is proper format
+        msg = "Polygons must be gp.GeoDataFrame with Code, X, Y columns"
         assert isinstance(polygons, gp.GeoDataFrame), msg
-        assert all([c in polygons.columns for c in ['Code','X','Y']]), msg
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #make point lookup
-        keys = polygons['Code'].values
-        vals = polygons[['X','Y']].values
+        assert all([c in polygons.columns for c in ["Code", "X", "Y"]]), msg
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # make point lookup
+        keys = polygons["Code"].values
+        vals = polygons[["X", "Y"]].values
         points = dict(zip(keys, vals))
-        #compute in parallel
-        utils.pool_caller(geometry.reduce_to_flow_map,
-                        (characteristic_col, 
-                        flow_col,
-                        out_path,
-                        points),
-                        pkl_groups,
-                        desc,
-                        ncores)
-        #update meta
+        # compute in parallel
+        utils.pool_caller(
+            geometry.reduce_to_flow_map,
+            (characteristic_col, flow_col, out_path, points),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
-    
-    def route_through_raster(self, 
-                             ras,
-                             agents=None,
-                             tracks=None,
-                             out_path=None,
-                             end=None,
-                             desc='Routing tracks through raster',
-                             ncores=1,
-                             **kwargs):
+
+    def route_through_raster(
+        self,
+        ras,
+        agents=None,
+        tracks=None,
+        out_path=None,
+        end=None,
+        desc="Routing tracks through raster",
+        ncores=1,
+        **kwargs,
+    ):
         """
         Routes tracks through a cost raster using a least cost path algorithm. This is a thin wrapper
         over skimage.graph.route_through_array, and will accept any of the kwargs the original function
         will accept:
 
-        https://scikit-image.org/docs/stable/api/skimage.graph.html#skimage.graph.route_through_array 
+        https://scikit-image.org/docs/stable/api/skimage.graph.html#skimage.graph.route_through_array
 
         This can be used to generate synthetic movements through obstacle arrays, or to very simply
         model the movement of agents through some form of force/cost/resistance field.
 
         The method only applies to tracks that intersect with the outline of the raster.
 
-        The simplest case is when a track passes through the raster completely. In this case, the 
+        The simplest case is when a track passes through the raster completely. In this case, the
         track is routed from the entrance to the exit of the raster outline.
-        
+
         The first edge case is when a track starts inside the raster and leaves. In this case, the
         track is routed from the first point on the track to the exit of the raster outline.
 
@@ -3303,7 +3608,7 @@ class Dataset:
         algorithm is more geared towards geometric/spatial rerouting.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files 
+        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
         in the original self.data_path location.
 
         Args:
@@ -3324,14 +3629,16 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #assert rasterio object
-        msg = 'raster must be a rasterio object'
+        # assert rasterio object
+        msg = "raster must be a rasterio object"
         assert isinstance(ras, rio.io.DatasetReader), msg
-        #set out path
+        # set out path
         out_path = self._set_out_path(out_path)
-        #get the raster info
+        # get the raster info
         b = ras.bounds
-        polygon, edges = utils.format_polygon(box(b.left, b.bottom, b.right, b.top))
+        polygon, edges = utils.format_polygon(
+            box(b.left, b.bottom, b.right, b.top)
+        )
         array = ras.read(1)
         transform = ras.transform
         width = ras.width
@@ -3339,41 +3646,41 @@ class Dataset:
         row_inds, col_inds = np.indices((height, width))
         x_coords, y_coords = transform * (col_inds, row_inds)
         coords = np.dstack([x_coords, y_coords])
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #compute in parallel
-        utils.pool_caller(geometry.route_through_raster,
-                          (array, 
-                           polygon, 
-                           edges, 
-                           coords,
-                           end,
-                           out_path,
-                           kwargs),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # compute in parallel
+        utils.pool_caller(
+            geometry.route_through_raster,
+            (array, polygon, edges, coords, end, out_path, kwargs),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         self = self._update_meta(out_path, self.meta)
         return self
 
     ############################################################################
-    #CLUSTERING
+    # CLUSTERING
     ############################################################################
 
     # def MiniBatchKMeans(self, ncores)
 
     ############################################################################
-    #CLASSIFYING
+    # CLASSIFYING
     ############################################################################
-                
-    def classify_in_polygon(self,
-                            polygon,
-                            agents=None,
-                            tracks=None, 
-                            ncores=1, 
-                            code=16,
-                            desc='Classifying tracks inside polygon'):
+
+    def classify_in_polygon(
+        self,
+        polygon,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        code=16,
+        desc="Classifying tracks inside polygon",
+    ):
         """
         Classifies points along tracks True if they fall on/within a specified polygon,
         and False if they do not. This classification is stored in a boolean column in the track data.
@@ -3388,36 +3695,42 @@ class Dataset:
                                     of certain tracks. If None, the operation applies to tracks related to the specified
                                     agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the classification operation. Defaults to 1.
-            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=16, then 
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=16, then
                                  the output column is Code16. Defaults to 16. Do not use 0.
             desc (str, optional): A brief description of the operation. Defaults to 'Classifying tracks inside polygon'.
 
         Returns:
             self: The Dataset instance.
         """
-        #get polygon
+        # get polygon
         polygon, edges = utils.format_polygon(polygon)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(classify.classify_in_polygon,
-                          (polygon, edges, code),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
-        meta = 'Inside Polygon'
-        self.meta[f'Code{code}'] = meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            classify.classify_in_polygon,
+            (polygon, edges, code),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
+        meta = "Inside Polygon"
+        self.meta[f"Code{code}"] = meta
         return self
-    
-    def classify_in_polygons(self,
-                            polygons,
-                            agents=None,
-                            tracks=None, 
-                            ncores=1,
-                            to_codes=False,
-                            name='Polygon',
-                            desc='Classifying tracks inside polygons'):
+
+    def classify_in_polygons(
+        self,
+        polygons,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        to_codes=False,
+        name="Polygon",
+        desc="Classifying tracks inside polygons",
+    ):
         """
         Classifies points if they fall om/within user defined polygons.
 
@@ -3435,7 +3748,7 @@ class Dataset:
         behaviour as Dataset.classify_in_polygon, just with more than 1 polygon.
 
         Args:
-            polygons: geopandas GeoDataFrame with a series of shapely Polygons for geometry, and a Code column with unique 
+            polygons: geopandas GeoDataFrame with a series of shapely Polygons for geometry, and a Code column with unique
                      integers for each polygon. Do not use 0 as a Code value.
             agents (list, optional): A list of agent IDs to be included in the classification. If None, the classification
                                     will consider all agents in the dataset.
@@ -3453,33 +3766,83 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #copy
+        # copy
         polygons = polygons.copy()
-        #get polygons
-        polygons['polys'] = polygons.geometry.apply(utils.format_polygon)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #resample in parallel
-        utils.pool_caller(classify.classify_in_polygons,
-                          (polygons, to_codes, name),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
-        meta='Inside Polygon'
-        for code in polygons['Code'].values:
-            self.meta[f'Code{code}'] = meta
+        # get polygons
+        polygons["polys"] = polygons.geometry.apply(utils.format_polygon)
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            classify.classify_in_polygons,
+            (polygons, to_codes, name),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
+        meta = "Inside Polygon"
+        for code in polygons["Code"].values:
+            self.meta[f"Code{code}"] = meta
         return self
-    
-    def classify_speed(self, 
-                       speed, 
-                       higher=True, 
-                       lower=False, 
-                       agents=None,
-                       tracks=None, 
-                       ncores=1, 
-                       code=17,
-                       desc='Classifying tracks by speed threshold'):
+
+    def classify_toward_point(
+        self: "Dataset",
+        point: Point,
+        agents: list | None = None,
+        tracks: list | None = None,
+        ncores: int = 1,
+        code: int = 16,
+        desc: str = "Classifying tracks toward point",
+    ):
+        """
+        Classifies tracks True if they head towards a given point, and False if they do not. This classification is stored in a boolean column in the track data.
+
+        Args:
+            point (Point): The Point must be a shapely Point.
+            agents (list, optional): A list of agent IDs to be included in the classification. If None, the classification
+                                    will consider all agents in the dataset.
+            tracks (list, optional): A list of specific track IDs to be classified. This allows for selective analysis
+                                    of certain tracks. If None, the operation applies to tracks related to the specified
+                                    agents or all tracks if no agents are specified.
+            ncores (int, optional): The number of processing cores to use for the classification operation. Defaults to 1.
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=16, then
+                                 the output column is Code16. Defaults to 16. Do not use 0.
+            desc (str, optional): A brief description of the operation. Defaults to 'Classifying tracks toward point'.
+
+        Returns:
+            self: The Dataset instance.
+        """
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # resample in parallel
+        utils.pool_caller(
+            classify.classify_toward_point,
+            (point, code),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
+        meta = "Toward Point"
+        self.meta[f"Code{code}"] = meta
+        return self
+
+    def classify_speed(
+        self,
+        speed,
+        higher=True,
+        lower=False,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        code=17,
+        desc="Classifying tracks by speed threshold",
+    ):
         """
         Classifies points on tracks based on a speed threshold, marking them according to whether their speeds are
         higher or lower than the specified threshold. This function is useful for identifying high-speed movements,
@@ -3503,7 +3866,7 @@ class Dataset:
                                     specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the classification operation. Defaults
                                     to 1.
-            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=17, then 
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=17, then
                                  the output column is Code17. Defaults to 17. Do not use 0.
             desc (str, optional): A brief description of the operation. Defaults to 'Classifying tracks by speed threshold',
                                 which can be customized for more specific descriptions or contexts of the classification.
@@ -3511,33 +3874,41 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #check for bounds
+        # check for bounds
         if lower:
             higher = False
         elif higher:
             lower = False
         else:
-            raise Exception('Must pass higher=True or lower=True, but not both')
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process in parallel
-        utils.pool_caller(classify.classify_speed,
-                          (speed, higher, code),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+            raise Exception(
+                "Must pass higher=True or lower=True, but not both"
+            )
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process in parallel
+        utils.pool_caller(
+            classify.classify_speed,
+            (speed, higher, code),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = f'Speed {">=" if higher else "<="} {speed}'
-        self.meta[f'Code{code}'] = meta
+        self.meta[f"Code{code}"] = meta
         return self
-    
-    def classify_turns(self, 
-                       rate, 
-                       agents=None,
-                       tracks=None, 
-                       ncores=1, 
-                       code=18,
-                       desc='Classifying turning tracks'):
+
+    def classify_turns(
+        self,
+        rate,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        code=18,
+        desc="Classifying turning tracks",
+    ):
         """
         Classifies points on tracks based on their turning rate, identifying parts of tracks that exhibit turning behavior above
         a specified threshold. This can be particularly useful for understanding navigational patterns,
@@ -3556,36 +3927,38 @@ class Dataset:
                                     for the focused analysis of certain tracks. If None, the operation applies to tracks
                                     related to the specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the classification operation. Defaults to 1.
-            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=18, then 
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=18, then
                                  the output column is Code18. Defaults to 18. Do not use 0.
             desc (str, optional): A brief description of the operation. Defaults to 'Classifying turning tracks'.
 
         Returns:
             self: The Dataset instance.
         """
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process in parallel
-        utils.pool_caller(classify.classify_turns,
-                          (rate, code),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process in parallel
+        utils.pool_caller(
+            classify.classify_turns, (rate, code), pkl_groups, desc, ncores
+        )
+        # update meta
         meta = f"Turning rate >= {rate} deg/sec"
-        self.meta[f'Code{code}'] = meta
-        return self 
-    
-    def classify_speed_in_polygon(self, 
-                                  speed, 
-                                  polygon,
-                                  higher=True, 
-                                  lower=False, 
-                                  agents=None,
-                                  tracks=None, 
-                                  ncores=1, 
-                                  code=19,
-                                  desc='Classifying tracks by speed threshold in polygon'):
+        self.meta[f"Code{code}"] = meta
+        return self
+
+    def classify_speed_in_polygon(
+        self,
+        speed,
+        polygon,
+        higher=True,
+        lower=False,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        code=19,
+        desc="Classifying tracks by speed threshold in polygon",
+    ) -> "Dataset":
         """
         This is simply a combination of Dataset.classify_in_polygon and Dataset.classify_speed.
         This classifies points on tracks if they meet or don't meet a speed threshold inside of a given polygon.
@@ -3595,10 +3968,8 @@ class Dataset:
         Args:
             polygon: The polygon must be a shapely Polygon, or a Nx2 array representing the outline of a polygon.
             speed (float): The speed threshold used for classification.
-            higher (bool, optional): If True, tracks or agents with speeds higher than the specified threshold will
-                                    be classified. Defaults to True.
-            lower (bool, optional): If True, tracks or agents with speeds lower than the specified threshold will
-                                    be classified. Defaults to False.
+            higher (bool, optional): If True, tracks or agents with speeds higher or equal than the specified threshold will
+                                    be classified. Otherwise lower (or equal) speeds will be classified. Defaults to True.
             agents (list, optional): A list of agent IDs to be included in the speed classification. If None,
                                     the classification considers all agents in the dataset.
             tracks (list, optional): A list of specific track IDs to be classified by speed. This allows for selective
@@ -3606,50 +3977,49 @@ class Dataset:
                                     specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the classification operation. Defaults
                                     to 1.
-            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=19, then 
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=19, then
                                  the output column is Code19. Defaults to 19. Do not use 0.
             desc (str, optional): A brief description of the operation. Defaults to 'Classifying tracks by speed threshold in polygon',
                                 which can be customized for more specific descriptions or contexts of the classification.
 
         Returns:
-            self: The Dataset instance.
+            Dataset: The Dataset instance.
         """
-        #get polygon
+        # get polygon
         polygon, edges = utils.format_polygon(polygon)
-        #check for bounds
-        if lower:
-            higher = False
-        elif higher:
-            lower = False
-        else:
-            raise Exception('Must pass higher=True or lower=True, but not both')
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process in parallel
-        utils.pool_caller(classify.classify_speed_in_polygon,
-                          (speed, polygon, edges, higher, code),
-                          pkl_groups,
-                          desc,
-                          ncores) 
-        #update meta
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process in parallel
+        utils.pool_caller(
+            classify.classify_speed_in_polygon,
+            (speed, polygon, edges, higher, code),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
         meta = f'Speed {">=" if higher else "<="} {speed} inside Polygon'
-        self.meta[f'Code{code}'] = meta
-        return self   
-    
-    def classify_trip(self, 
-                      poly1, 
-                      poly2,  
-                      agents=None,
-                      tracks=None, 
-                      ncores=1, 
-                      code=20,
-                      desc='Classifying tracks by trip'):
+        self.meta[f"Code{code}"] = meta
+        return self
+
+    def classify_trip(
+        self,
+        poly1,
+        poly2,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        code=20,
+        desc="Classifying tracks by trip",
+    ):
         """
         Classifies tracks if they do a trip between two polygons (either direction).
 
         The track must start/end in poly1/poly2. Only the first and last points on the track are used for
         this classification.
-         
+
         If a track meets this condition, a boolean Code column will be added with True for every row in the track data.
 
         poly1 and poly2 must be shapely Polygons or Nx2 numpy arrays representing the outline of a polygon.
@@ -3664,46 +4034,52 @@ class Dataset:
                                     to tracks related to the specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the classification operation. Defaults
                                     to 1.
-            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=20, then 
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=20, then
                                  the output column is Code20. Defaults to 20. Do not use 0.
             desc (str, optional): A brief description of the operation. Defaults to 'Classifying tracks by trip'.
 
         Returns:
             self: The Dataset instance.
         """
-        #get polygons
+        # get polygons
         poly1, edges1 = utils.format_polygon(poly1)
         poly2, edges2 = utils.format_polygon(poly2)
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process in parallel
-        utils.pool_caller(classify.classify_trip,
-                          (poly1, edges1, poly2, edges2, code),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
-        meta = 'Trip between 2 polygons'
-        self.meta[f'Code{code}'] = meta
-        return self 
-    
-    def classify_touching(self, 
-                          geom, 
-                          agents=None,
-                          tracks=None, 
-                          ncores=1, 
-                          code=21,
-                          desc='Classifying tracks touching object'):
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process in parallel
+        utils.pool_caller(
+            classify.classify_trip,
+            (poly1, edges1, poly2, edges2, code),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
+        meta = "Trip between 2 polygons"
+        self.meta[f"Code{code}"] = meta
+        return self
+
+    def classify_touching(
+        self,
+        geom,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        code=21,
+        desc="Classifying tracks touching object",
+    ):
         """
-        Classifies tracks based on whether they touch or intersect a specified geometric object. 
-        
+        Classifies tracks based on whether they touch or intersect a specified geometric object.
+
         The geom kwarg must be a shapely LineString, MultiLineString, Polygon, or MultiPolygon.
 
         If a given track touches this object, the resulting boolean Code column will be True for
         every row in the track data.
-        
-        This function is useful for identifying movements that come into contact with geographic 
-        features or defined areas, supporting analyses related to boundary crossings, 
+
+        This function is useful for identifying movements that come into contact with geographic
+        features or defined areas, supporting analyses related to boundary crossings,
         interactions with areas of interest, or proximity to specific objects.
 
         Args:
@@ -3714,42 +4090,43 @@ class Dataset:
                                     This allows for selective analysis of certain tracks. If None, the operation applies
                                     to tracks related to the specified agents or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the classification operation. Defaults to 1.
-            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=21, then 
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=21, then
                                  the output column is Code21. Defaults to 21. Do not use 0.
             desc (str, optional): A brief description of the operation. Defaults to 'Classifying tracks touching object'.
 
         Returns:
             self: The Dataset instance.
         """
-        msg = 'geom must be shapely LineString, MultiLineString, Polygon, or MultiPolygon'
-        assert isinstance(geom, (LineString, 
-                                 MultiLineString, 
-                                 Polygon, 
-                                 MultiPolygon)), msg
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process in parallel
-        utils.pool_caller(classify.classify_touching,
-                          (geom, code),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
-        meta = 'Touching object'
-        self.meta[f'Code{code}'] = meta
-        return self 
+        msg = "geom must be shapely LineString, MultiLineString, Polygon, or MultiPolygon"
+        assert isinstance(
+            geom, (LineString, MultiLineString, Polygon, MultiPolygon)
+        ), msg
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process in parallel
+        utils.pool_caller(
+            classify.classify_touching, (geom, code), pkl_groups, desc, ncores
+        )
+        # update meta
+        meta = "Touching object"
+        self.meta[f"Code{code}"] = meta
+        return self
 
-    def classify_stops(self, 
-                       stop_threshold=0.15, 
-                       min_stop_duration=1800, 
-                       agents=None,
-                       tracks=None, 
-                       ncores=1, 
-                       code=22,
-                       desc='Classifying stopped tracks'):
+    def classify_stops(
+        self,
+        stop_threshold=0.15,
+        min_stop_duration=1800,
+        agents=None,
+        tracks=None,
+        ncores=1,
+        code=22,
+        desc="Classifying stopped tracks",
+    ):
         """
-        Classifies points along tracks where the agents have stopped, based on a specified speed threshold and minimum stop duration. 
-        
+        Classifies points along tracks where the agents have stopped, based on a specified speed threshold and minimum stop duration.
+
         If points along tracks meet the stopping thresholds, the resulting boolean Code column will be True, otherrwise False.
 
         The stop_threshold is in the same units as the Dataset CRS, i.e. degrees for geographic or meters for UTM, etc.
@@ -3766,45 +4143,51 @@ class Dataset:
                                     of certain tracks. If None, the operation applies to tracks related to the specified agents
                                     or all tracks if no agents are specified.
             ncores (int, optional): The number of processing cores to use for the classification operation. Defaults to 1.
-            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=22, then 
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=22, then
                                  the output column is Code22. Defaults to 22. Do not use 0.
             desc (str, optional): A brief description of the operation. Defaults to 'Classifying stopped tracks'.
 
         Returns:
             self: The Dataset instance.
         """
-            #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(agents, tracks)))
-        #process in parallel
-        utils.pool_caller(classify.classify_stops,
-                          (stop_threshold, min_stop_duration, code),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
-        meta = f'Stopped: Speed <= {stop_threshold} and Duration >= {min_stop_duration}'
-        self.meta[f'Code{code}'] = meta
-        return self 
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(agents, tracks))
+        )
+        # process in parallel
+        utils.pool_caller(
+            classify.classify_stops,
+            (stop_threshold, min_stop_duration, code),
+            pkl_groups,
+            desc,
+            ncores,
+        )
+        # update meta
+        meta = f"Stopped: Speed <= {stop_threshold} and Duration >= {min_stop_duration}"
+        self.meta[f"Code{code}"] = meta
+        return self
 
-    def classify_custom(self, 
-                        values, 
-                        ncores=1, 
-                        code=23,
-                        desc='Classifying tracks with custom code',
-                        meta='Custom classifier'):
+    def classify_custom(
+        self,
+        values,
+        ncores=1,
+        code=23,
+        desc="Classifying tracks with custom code",
+        meta="Custom classifier",
+    ):
         """
         Applies a custom classification to tracks based on an input pandas DataFrame.
 
         This DataFrame must have an index consisting of Track IDs, and a "Value" column consisting
         of True/False values to classify the tracks.
-        
-        This offers flexibility to implement user-defined classification logic into the trackio framework, 
-        supporting a wide range of analytical needs from behavior categorization to environmental interaction analysis. 
+
+        This offers flexibility to implement user-defined classification logic into the trackio framework,
+        supporting a wide range of analytical needs from behavior categorization to environmental interaction analysis.
 
         Args:
             values (pd.DataFrame): values must be a pd.DataFrame with Track IDs as index, and a "Value" column consisting of booleans.
             ncores (int, optional): The number of processing cores to use for the classification operation. Defaults to 1.
-            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=23, then 
+            code (int, optional): A numerical code to be used for the resulting boolean column. E.g. if code=23, then
                                  the output column is Code23. Defaults to 23. Do not use 0.
             desc (str, optional): A brief description of the operation. Defaults to 'Classifying tracks with custom code'.
             meta (str, optional): A description related to the custom classifier being applied. This gets added
@@ -3813,98 +4196,95 @@ class Dataset:
         Returns:
             self: The Dataset instance.
         """
-        #make sure it contains the column and is boolean
+        # make sure it contains the column and is boolean
         msg = 'values must be a pd.DataFrame with Track IDs as index, and a "Value" column consisting of booleans'
-        assert 'Value' in values.columns and values['Value'].dtype == bool, msg
-        #get the files to process
-        pkl_groups = list(zip(*self._get_files_tracks_to_process(None, values.index)))
-        #process in parallel
-        utils.pool_caller(classify.classify_custom,
-                          (values, code),
-                          pkl_groups,
-                          desc,
-                          ncores)
-        #update meta
-        self.meta[f'Code{code}'] = meta
+        assert "Value" in values.columns and values["Value"].dtype == bool, msg
+        # get the files to process
+        pkl_groups = list(
+            zip(*self._get_files_tracks_to_process(None, values.index))
+        )
+        # process in parallel
+        utils.pool_caller(
+            classify.classify_custom, (values, code), pkl_groups, desc, ncores
+        )
+        # update meta
+        self.meta[f"Code{code}"] = meta
         return self
-       
+
+
 ################################################################################
 
+
 def _meta_to_agents(meta, crs):
-    #make dataframe from meta dict
-    df = pd.DataFrame(meta).T.set_index('Agent ID')
-    #drop track meta dicts
+    # make dataframe from meta dict
+    df = pd.DataFrame(meta).T.set_index("Agent ID")
+    # drop track meta dicts
     df.drop(columns=["Tracks"], inplace=True)
-    #make bounding box geometry
-    _geometry = df[['Xmin',
-                   'Ymin',
-                   'Xmax',
-                   'Ymax']].apply(lambda b: box(b['Xmin'], 
-                                               b['Ymin'], 
-                                               b['Xmax'], 
-                                               b['Ymax']), axis=1)
-    #convert to geodataframe
+    # make bounding box geometry
+    _geometry = df[["Xmin", "Ymin", "Xmax", "Ymax"]].apply(
+        lambda b: box(b["Xmin"], b["Ymin"], b["Xmax"], b["Ymax"]), axis=1
+    )
+    # convert to geodataframe
     df = gp.GeoDataFrame(df, geometry=_geometry, crs=crs)
     return df
 
+
 def _meta_to_tracks(meta, crs):
-    #initialize dataframe rows/indices
+    # initialize dataframe rows/indices
     rows = []
     # ids = []
-    #loop over meta dict, create entries for each track
+    # loop over meta dict, create entries for each track
     for vid, vmeta in meta.items():
-        #get the track ids
+        # get the track ids
         # _ids = [f"{vid}_{tid}" for tid in vmeta["Tracks"].keys()]
-        #get the combined track meta rows
-        _vmeta = {k:v for k,v in vmeta.items() if k != 'Tracks'}
+        # get the combined track meta rows
+        _vmeta = {k: v for k, v in vmeta.items() if k != "Tracks"}
         tmeta = [
             {**_vmeta, **vmeta["Tracks"][tid]}
             for tid in vmeta["Tracks"].keys()
         ]
         # ids.extend(_ids)
         rows.extend(tmeta)
-    #create dataframe from rows and indices
+    # create dataframe from rows and indices
     df = pd.DataFrame(rows)
     # df.index = ids
-    df.set_index('Track ID', inplace=True)
-    #create bounding box geometry
-    _geometry = df[['Xmin',
-                   'Ymin',
-                   'Xmax',
-                   'Ymax']].apply(lambda b: box(b['Xmin'], 
-                                               b['Ymin'], 
-                                               b['Xmax'], 
-                                               b['Ymax']), axis=1)
-    #drop pointless column
+    df.set_index("Track ID", inplace=True)
+    # create bounding box geometry
+    _geometry = df[["Xmin", "Ymin", "Xmax", "Ymax"]].apply(
+        lambda b: box(b["Xmin"], b["Ymin"], b["Xmax"], b["Ymax"]), axis=1
+    )
+    # drop pointless column
     df.drop(columns=["ntracks"], inplace=True)
-    #convert to geodataframe
+    # convert to geodataframe
     df = gp.GeoDataFrame(df, geometry=_geometry, crs=crs)
     return df
 
+
 def _refresh_meta(agents_only, file):
-    #make a new meta dict and track_meta dict
+    # make a new meta dict and track_meta dict
     meta = {}
     track_meta = {}
-    #read the vessel
+    # read the vessel
     v = utils.read_pkl(file)
-    #loop over tracks, populate track_meta
+    # loop over tracks, populate track_meta
     tids = v.tracks.keys()
     for tid in tids:
         track_meta[tid] = gen_track_meta(v.tracks[tid])
-        track_meta[tid]['Track ID'] = f"{v.meta['Agent ID']}_{tid}"
-    #reset vessel.track_meta
+        track_meta[tid]["Track ID"] = f"{v.meta['Agent ID']}_{tid}"
+    # reset vessel.track_meta
     v.track_meta = track_meta
-    #reset vessel.vessel_meta
+    # reset vessel.vessel_meta
     v.agent_meta = gen_agent_meta(v)
-    v.agent_meta['File'] = file
-    #update output meta dict
-    meta[v.agent_meta['Agent ID']] = v.agent_meta
-    meta[v.agent_meta['Agent ID']]['Tracks'] = track_meta
-    #if tracks not split, pings exist in pickle chunks - don't overwrite
+    v.agent_meta["File"] = file
+    # update output meta dict
+    meta[v.agent_meta["Agent ID"]] = v.agent_meta
+    meta[v.agent_meta["Agent ID"]]["Tracks"] = track_meta
+    # if tracks not split, pings exist in pickle chunks - don't overwrite
     if not agents_only:
         utils.save_pkl(file, v)
     meta_cols = list(v.meta.keys())
     data_cols = v.data.columns.tolist()
     return meta, meta_cols, data_cols
+
 
 ################################################################################
