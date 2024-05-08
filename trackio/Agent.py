@@ -1,4 +1,4 @@
-################################################################################
+###############################################################################
 
 import warnings
 
@@ -12,9 +12,10 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-################################################################################
-
+# must have columns in the data
 must_cols = ["Time", "X", "Y"]
+
+###############################################################################
 
 
 class Agent:
@@ -25,18 +26,21 @@ class Agent:
         data=pd.DataFrame({c: [] for c in must_cols}),
     ):
         """
-        Initializes an Agent instance with a unique identifier, metadata, and associated dynamic data.
+        Initializes an Agent instance with a unique identifier, metadata, and
+        associated dynamic data.
 
-        The data kwarg must be a pandas DataFrame with AT MINIMUM [Time, X, Y] columns. The Time
-        column must be compatible with the pandas pd.to_dateime function.
+        The data kwarg must be a pandas DataFrame with AT MINIMUM [Time, X, Y]
+        columns. The Time column must be compatible with the pandas
+        pd.to_datetime function.
 
         Args:
         id (str): The unique identifier for the agent. Defaults to 'agent'.
-        meta (dict): A dictionary containing metadata about the agent. This could include
-                               characteristics such as type, category, status, or any other descriptive
-                               information. Defaults to an empty dictionary.
-        data (pd.DataFrame): A pandas DataFrame consisting of, at minimum, [Time, X, Y] columns containing
-                            point data.
+        meta (dict): A dictionary containing metadata about the agent. This
+                    could include characteristics such as type, category,
+                    status, or any other descriptive information. Defaults to
+                    an empty dictionary.
+        data (pd.DataFrame): A pandas DataFrame consisting of, at minimum,
+                            [Time, X, Y] columns containing point data.
         """
         # set data vars
         self._data = data
@@ -51,9 +55,9 @@ class Agent:
         self.agent_meta = {}
         self.track_meta = {}
 
-    ############################################################################
+    ###########################################################################
     # ATTRIBUTES
-    ############################################################################
+    ###########################################################################
 
     @property
     def data(self):
@@ -62,16 +66,15 @@ class Agent:
         else:
             return self._data
 
-    ############################################################################
+    ###########################################################################
     # METHODS
-    ############################################################################
+    ###########################################################################
 
     def split_tracks_spatiotemporal(self, time, distance, tracks=[], method=0):
         # if only specific tracks
         if len(tracks) > 0:
             old_track_ids = [
-                f"{self.meta['Agent ID']}_T{i}"
-                for i in range(len(self.tracks))
+                f"{self.meta['Agent ID']}_{tid}" for tid in self.tracks.keys()
             ]
             keep_track_ids = [
                 tid.rsplit("_", 1)[1]
@@ -108,7 +111,8 @@ class Agent:
             # sort the data by time
             data = data.sort_values(by="Time").reset_index(drop=True)
             idxs = [[0]]
-            # loop over the data sequentially to account for overlapping data (i.e. wrong identifier for 2+ tracks)
+            # loop over the data sequentially to account for overlapping data
+            # (i.e. wrong identifier for 2+ tracks)
             for i in range(1, len(data)):
                 new_track = True
                 # for each already established track
@@ -161,7 +165,6 @@ class Agent:
     def split_tracks_by_data(self, data_col, tracks=[]):
         # if only specific tracks
         if len(tracks) > 0:
-            # old_track_ids = [f"{self.meta['Agent ID']}_T{i}" for i in range(len(self.tracks))]
             old_track_ids = [
                 f"{self.meta['Agent ID']}_{tid}" for tid in self.tracks.keys()
             ]
@@ -246,8 +249,7 @@ class Agent:
         # if only specific tracks
         if len(tracks) > 0:
             old_track_ids = [
-                f"{self.meta['Agent ID']}_T{i}"
-                for i in range(len(self.tracks))
+                f"{self.meta['Agent ID']}_{tid}" for tid in self.tracks.keys()
             ]
             keep_track_ids = [
                 tid.rsplit("_", 1)[1]
@@ -373,8 +375,7 @@ class Agent:
         # if only specific tracks
         if len(tracks) > 0:
             old_track_ids = [
-                f"{self.meta['Agent ID']}_T{i}"
-                for i in range(len(self.tracks))
+                f"{self.meta['Agent ID']}_{tid}" for tid in self.tracks.keys()
             ]
             keep_track_ids = [
                 tid.rsplit("_", 1)[1]
@@ -449,7 +450,7 @@ class Agent:
         return self
 
 
-################################################################################
+###############################################################################
 
 
 # generate the metadata
@@ -510,3 +511,6 @@ def gen_agent_meta(self):
         **vdf.filter(like="Code").any(axis=0).to_dict(),
     }
     return vmeta
+
+
+###############################################################################
