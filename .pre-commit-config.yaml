@@ -19,5 +19,11 @@ repos:
       hooks:
       -   id: flake8
           args: 
-            - "--ignore=E501,E203,W503,E722"
+            - "--ignore=E501,E203,W503"
             - "--per-file-ignore=*/__init__.py:F401"
+  - repo: https://github.com/myint/docformatter
+    rev: v1.4
+    hooks:
+      - id: docformatter
+        args: ['--in-place', '--wrap-summaries=79', '--wrap-descriptions=79', '--pre-summary-newline']
+        additional_dependencies: ['toml']

@@ -3,9 +3,6 @@ DEV/*
 trackio/supporting/*.pdf
 trackio/supporting/*.pptx
 trackio.egg-info/
+build/
 *.gpkg
-*.gpkg
-trackio/tools/stats.py
-trackio/tools/ais.py
-notebooks/runall.ipynb
 notebooks/example3_Canada_Goose_migrations/North-East American Canada goose migration 2015-2021.csv
