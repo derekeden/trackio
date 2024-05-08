@@ -1,8 +1,6 @@
-################################################################################
+###############################################################################
 
 import os
-
-# for dividing by zero in lin alg equations - returns nan anyways, but annoying
 import warnings
 
 import numpy as np
@@ -15,9 +13,10 @@ from skimage.graph import route_through_array
 
 from .utils import NN_idx2, collect_agent_pkls, read_pkl, save_pkl
 
+# for dividing by zero in lin alg equations - returns nan anyways, but annoying
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-################################################################################
+###############################################################################
 
 
 def interpolate_dynamic_data(track, newx, oldx):
@@ -1193,7 +1192,8 @@ def find_intersection_point(A, B, P):
 
 def perpendicular_distance(A, B, P):
     """
-    Calculate the perpendicular distance from a point P to a line defined by points A and B.
+    Calculate the perpendicular distance from a point P to a line defined by
+    points A and B.
 
     Parameters:
     A, B: Points defining the line, given as tuples (x, y).
@@ -2091,16 +2091,13 @@ def route_through_raster(
             new_y = coords[rows, cols, 1]
             # get new coordinates
             before = track.iloc[before_idx]
-            try:
-                routed = pd.DataFrame(
-                    {
-                        "X": new_x,
-                        "Y": new_y,
-                        "Time": [t0, *[pd.NaT] * (len(new_x) - 2), t1],
-                    }
-                )
-            except:
-                print(agent.agent_meta["Agent ID"], tid)
+            routed = pd.DataFrame(
+                {
+                    "X": new_x,
+                    "Y": new_y,
+                    "Time": [t0, *[pd.NaT] * (len(new_x) - 2), t1],
+                }
+            )
             after = track.iloc[after_idx]
             new_tracks.append(pd.concat([before, routed, after]))
         # reconstruct track
@@ -2120,4 +2117,4 @@ def route_through_raster(
     save_pkl(out_file, agent)
 
 
-################################################################################
+###############################################################################
