@@ -1,4 +1,4 @@
-################################################################################
+###############################################################################
 
 import json
 import multiprocessing as mp
@@ -20,8 +20,6 @@ from .utils import (
 GREEN = "\033[92m"
 ENDC = "\033[0m"  # for tqdm bar
 
-################################################################################
-
 # these are hardcoded
 code_mapper_file = (
     f"{os.path.dirname(__file__)}/supporting/ais_code_mapper.csv"
@@ -33,6 +31,8 @@ column_mapper_file = (
 status_mapper_file = (
     f"{os.path.dirname(__file__)}/supporting/ais_status_mapper.csv"
 )
+
+###############################################################################
 
 
 def read_json(json_file):
@@ -107,8 +107,8 @@ class mappers:
 
     def update(self, old, new):
         """
-        Updates the mapper file stored on disk. Use this when you want to add or update an entry
-        so it get's auto-detected next time.
+        Updates the mapper file stored on disk. Use this when you want to add
+        or update an entry so it get's auto-detected next time.
 
         Args:
             old: Original dictionary mapper.
@@ -476,8 +476,8 @@ def make_raw_data_mapper(
     sep=",",
 ):
     """
-    Creates a dictionary mapper of possible raw data values in a list of files, for a
-    list of columns in the raw files.
+    Creates a dictionary mapper of possible raw data values in a list of files,
+    for a list of columns in the raw files.
 
     Args:
         files: List of file paths to process.
@@ -516,3 +516,6 @@ def make_raw_data_mapper(
         return out[key]
     else:
         return out
+
+
+###############################################################################

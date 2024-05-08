@@ -1,4 +1,4 @@
-################################################################################
+###############################################################################
 
 import glob
 import multiprocessing as mp
@@ -33,12 +33,12 @@ ENDC = "\033[0m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
 
-################################################################################
-
 # hardcoded file names
 agent_database = "agent.db"
 track_database = "track.db"
 dataset_meta = "dataset.db"
+
+###############################################################################
 
 
 class Dataset:
@@ -57,10 +57,14 @@ class Dataset:
 
         Args:
             data_path (str): Defaults to './data'.
-            raw_files (list, optional): List of raw data files. Defaults to None.
-            raw_df (pd.DataFrame, optional): Raw data in dataframe format. Defaults to None.
-            raw_gdf (gp.GeoDataFrame, optional): Raw data in geodataframe format. Defaults to None.
-            data_files (list, optional): List of processed data files (*.points or *.tracks). Defaults to None.
+            raw_files (list, optional): List of raw data files. Defaults to
+                                        None.
+            raw_df (pd.DataFrame, optional): Raw data in dataframe format.
+                                            Defaults to None.
+            raw_gdf (gp.GeoDataFrame, optional): Raw data in geodataframe
+                                                format. Defaults to None.
+            data_files (list, optional): List of processed data files (*.points
+                                        or *.tracks). Defaults to None.
             meta (dict, optional): Dataset metadata dictionary. Defaults to {}.
         Returns:
             Dataset: Initialized Dataset object.
@@ -115,23 +119,26 @@ class Dataset:
             + path_repr
         )
 
-    ############################################################################
+    ###########################################################################
     # ATTRIBUTES
-    ############################################################################
+    ###########################################################################
 
     # agent database
     @property
     def agents(self):
         """
-        Agent database. This is the GeoDataFrame stored in self.data_path/agent.db.
-        Use this to efficiently query agents.
+        Agent database.
+
+        This is the GeoDataFrame stored in self.data_path/agent.db. Use this to
+        efficiently query agents.
         """
         try:
             return utils.read_pkl(f"{self.data_path}/{agent_database}")
         except FileNotFoundError:
             msg = (
                 RED
-                + f"{self.data_path}/{agent_database} not found, run self.refresh_meta() first"
+                + f"{self.data_path}/{agent_database} not found, "
+                + "run self.refresh_meta() first"
                 + ENDC
             )
             print(msg)
@@ -140,15 +147,18 @@ class Dataset:
     @property
     def tracks(self):
         """
-        Track database. This is the GeoDataFrame stored in self.data_path/track.db.
-        Use this to efficiently query tracks.
+        Track database.
+
+        This is the GeoDataFrame stored in self.data_path/track.db. Use this to
+        efficiently query tracks.
         """
         try:
             return utils.read_pkl(f"{self.data_path}/{track_database}")
         except FileNotFoundError:
             msg = (
                 RED
-                + f"{self.data_path}/{track_database} not found, run self.refresh_meta() first..."
+                + f"{self.data_path}/{track_database} not found, "
+                + "run self.refresh_meta() first..."
                 + ENDC
             )
             print(msg)
@@ -176,9 +186,9 @@ class Dataset:
             mapper["Tracks"][aid] = os.path.abspath(file)
         return mapper
 
-    ############################################################################
+    ###########################################################################
     # METHODS
-    ############################################################################
+    ###########################################################################
 
     def _check_files(self, data_files):
         # if None is passed
@@ -276,9 +286,9 @@ class Dataset:
             out = Dataset(data_path=out_path)
         return out
 
-    ############################################################################
+    ###########################################################################
     # PREPROCESSING
-    ############################################################################
+    ###########################################################################
 
     def group_points(
         self,
@@ -295,28 +305,36 @@ class Dataset:
         desc="Grouping points",
     ):
         """
-        Groups all points in Dataset based on groupby column(s) to isolate
-        the points belonging to each unique agent in the raw data. Grouped
-        data is written to *.points files in the Dataset.data_path location.
+        Groups all points in Dataset based on groupby column(s) to isolate the
+        points belonging to each unique agent in the raw data. Grouped data is
+        written to *.points files in the Dataset.data_path location.
 
         Note, ['Time', 'X', 'Y'] is the bare minimum required for data_cols.
 
-        Also, the continued kwarg is used to resume (crashed or previous) analyses
-        in the Dataset.data_path folder. By default, this is set to False to avoid
-        data corruption or overwriting.
+        Also, the continued kwarg is used to resume (crashed or previous)
+        analyses in the Dataset.data_path folder. By default, this is set to
+        False to avoid data corruption or overwriting.
 
         Args:
-            col_mapper (dict, optional): Mapping for column names. Defaults to {}.
-            meta_cols (list, optional): List of metadata columns to maintain. Defaults to [].
-            data_cols (list): List of data columns to maintain. Defaults to ['Time', 'X', 'Y'].
-            groupby (str, list): Column name(s) to group points by. Defaults to 'Unique_ID'.
-            data_mappers (dict): Data mappers for raw data transformation during grouping. Defaults to {}.
-            chunksize (float): Size of chunks for raw data reading/processing. Defaults to 1e6 rows/entries.
-            continued (bool): Flag to indicate continuation of previous processing in Dataset.data_path. Defaults to False.
+            col_mapper (dict, optional): Mapping for column names. Defaults to
+                                        {}.
+            meta_cols (list, optional): List of metadata columns to maintain.
+                                        Defaults to [].
+            data_cols (list): List of data columns to maintain. Defaults to
+                            ['Time', 'X', 'Y'].
+            groupby (str, list): Column name(s) to group points by. Defaults to
+                                'Unique_ID'.
+            data_mappers (dict): Data mappers for raw data transformation during
+                                grouping. Defaults to {}.
+            chunksize (float): Size of chunks for raw data reading/processing.
+                            Defaults to 1e6 rows/entries.
+            continued (bool): Flag to indicate continuation of previous
+                            processing in Dataset.data_path. Defaults to False.
             prefix (str): Prefix for output files. Defaults to 'agent'.
             ncores (int): Number of cores to use for processing. Defaults to 1.
             sep (str, optional): The separator of the csv file. Defaults to ','.
-            desc (str): Description of the operation. Defaults to 'Grouping points'.
+            desc (str): Description of the operation. Defaults to 'Grouping
+                        points'.
 
         Returns:
             self: Returns the original Dataset instance.
@@ -401,28 +419,38 @@ class Dataset:
         desc="Splitting tracks using spatiotemporal threshold",
     ):
         """
-        Perform standard spatiotemporal split on points to generate tracks. This algorithm
-        simply looks at gaps between adjacent points, if the gap in time OR distance is exceeded
-        between points, this is considered a split to a new track.
+        Perform standard spatiotemporal split on points to generate tracks.
+        This algorithm looks at gaps between adjacent points. If the gap in
+        time or distance is exceeded, it marks a split to a new track.
 
-        This can be used to split *.points files for the first time, or resplit tracks another way
-        after they've already been split.
+        This can be used to split *.points files for the first time, or resplit
+        tracks another way after they've already been split.
 
-        If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
+        If you pass remove=True, it will delete *.points files as they are split
+        and saved into *.tracks files.
 
-        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
-        in the original self.data_path location.
+        If you pass a directory for the out_path kwarg, the *.tracks files will
+        be saved to this directory, and self.data_path will be changed as well.
+        If you pass None, it simply saves the *.tracks files in the original
+        self.data_path location.
 
         Args:
             agents (optional): Specific list of agent ids to be processed.
-            tracks (optional): Specific list track ids to be processed.
-            time (int, optional): Time threshold in seconds for splitting. Defaults to 3600 * 12 = 12 hours.
-            distance (int, float, optional): Distance threshold in the same units as DataSet (default is 0.5, approx. 55km if data is geographic). Defaults to 0.5.
-            ncores (int, optional): Number of cores to use for processing. Defaults to 1.
-            out_path (str, optional): Output path for the split tracks. Defaults to None (uses self.data_path).
-            remove (bool, optional): Whether to remove the original point files after splitting. Defaults to True.
-            desc (str, optional): Description of the operation. Defaults to 'Splitting tracks using spatiotemporal threshold'.
+            tracks (optional): Specific list of track ids to be processed.
+            time (int, optional): Time threshold in seconds for splitting.
+                                Defaults to 3600 * 12 = 12 hours.
+            distance (int, float, optional): Distance threshold in the same
+                                            units as DataSet (default is 0.5,
+                                            approx. 55km if data is geographic).
+                                            Defaults to 0.5.
+            ncores (int, optional): Number of cores to use for processing.
+                                    Defaults to 1.
+            out_path (str, optional): Output path for the split tracks. Defaults
+                                    to None (uses self.data_path).
+            remove (bool, optional): Whether to remove the original point files
+                                    after splitting. Defaults to True.
+            desc (str, optional): Description of the operation. Defaults to
+                                'Splitting tracks using spatiotemporal threshold'.
 
         Returns:
             self: The Dataset instance.
@@ -458,25 +486,39 @@ class Dataset:
         desc="Splitting tracks by changes in data column",
     ):
         """
-        Splits tracks based on changes in a specified data column. This method is useful for segmenting
-        tracks when a particular attribute changes, for example, when an agent's code column changes. This
-        function works by splitting tracks when the value in the specified data column changes, e.g. from
-        True to False, from 0 to 1, etc.
+        Splits tracks based on changes in a specified data column. This method
+        is useful for segmenting tracks when a particular attribute changes,
+        for example, when an agent's code column changes. This function works
+        by splitting tracks when the value in the specified data column
+        changes, e.g. from True to False, from 0 to 1, etc.
 
-        If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
+        If you pass remove=True, it will delete *.points files as they are
+        split and saved into *.tracks files.
 
-        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
-        in the original self.data_path location.
+        If you pass a directory for the out_path kwarg, the *.tracks files will
+        be saved to this directory, and self.data_path will be changed as
+        well. If you pass None, it simply saves the *.tracks files in the
+        original self.data_path location.
 
         Args:
-            agents (optional): Specific list of agent ids to be processed. If None, all agents are processed.
-            tracks (optional): Specific list of track ids to be processed. If None, all tracks are processed.
-            data_col (str, optional): The name of the data column to use as the criterion for splitting tracks. Defaults to 'Status'.
-            ncores (int, optional): Number of cores to use for processing. Defaults to 1.
-            out_path (str, optional): Output path for the split tracks. If None, uses the original dataset path. Defaults to None.
-            remove (bool, optional): Whether to remove the original .points files after splitting and saving the .tracks files. Defaults to True.
-            desc (str, optional): Description of the operation for logging or user information. Defaults to 'Splitting tracks by changes in data column'.
+            agents (optional): Specific list of agent ids to be processed. If
+                            None, all agents are processed.
+            tracks (optional): Specific list of track ids to be processed. If
+                            None, all tracks are processed.
+            data_col (str, optional): The name of the data column to use as the
+                                    criterion for splitting tracks. Defaults
+                                    to 'Status'.
+            ncores (int, optional): Number of cores to use for processing.
+                                    Defaults to 1.
+            out_path (str, optional): Output path for the split tracks. If None,
+                                    uses the original dataset path. Defaults
+                                    to None.
+            remove (bool, optional): Whether to remove the original .points
+                                    files after splitting and saving the
+                                    .tracks files. Defaults to True.
+            desc (str, optional): Description of the operation for logging or
+                                user information. Defaults to 'Splitting
+                                tracks by changes in data column'.
 
         Returns:
             self: The Dataset instance.
@@ -514,35 +556,47 @@ class Dataset:
         desc="Splitting overlapping tracks using spatiotemporal threshold",
     ):
         """
-        Perform standard spatiotemporal split on points to generate tracks. This algorithm
-        differs from split_tracks_spatiotemporal but uses the same inputs. This can sometimes
-        be used to perform a spatiotemporal split on data where there are duplicate Unique IDs
-        present in the data, making an agent look like it's in two places at once.
+        Perform standard spatiotemporal split on points to generate tracks.
+        This algorithm differs from split_tracks_spatiotemporal but uses the
+        same inputs. This can sometimes be used to perform a spatiotemporal
+        split on data where there are duplicate Unique IDs present in the data,
+        making an agent look like it's in two places at once.
 
-        This algorithm starts off with 1 track containing the first point. It then loops over the remaining
-        points. If the next point falls within the spatiotemporal thresholds of the previous point, it will
-        be append to that track. Otherwise, a new track will be created starting with that point. On the
-        next point, all existing tracks will be checked before creating a new one. This process
-        continues until there are no more points left to append.
+        This algorithm starts off with 1 track containing the first point. It then
+        loops over the remaining points. If the next point falls within the
+        spatiotemporal thresholds of the previous point, it will be appended to
+        that track. Otherwise, a new track will be created starting with that point.
+        On the next point, all existing tracks will be checked before creating a
+        new one. This process continues until there are no more points left to
+        append.
 
-        This can be used to split *.points files for the first time, or resplit tracks another way
-        after they've already been split.
+        This can be used to split *.points files for the first time, or resplit
+        tracks another way after they've already been split.
 
-        If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
+        If you pass remove=True, it will delete *.points files as they are split and
+        saved into *.tracks files.
 
-        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
-        in the original self.data_path location.
+        If you pass a directory for the out_path kwarg, the *.tracks files will be
+        saved to this directory, and self.data_path will be changed as well. If you
+        pass None, it simply saves the *.tracks files in the original self.data_path
+        location.
 
         Args:
             agents (optional): Specific list of agent ids to be processed.
             tracks (optional): Specific list track ids to be processed.
-            time (int, optional): Time threshold in seconds for splitting. Defaults to 3600 * 12 = 12 hours.
-            distance (int, float, optional): Distance threshold in the same units as DataSet (default is 0.5, approx. 55km if data is geographic). Defaults to 0.5.
-            ncores (int, optional): Number of cores to use for processing. Defaults to 1.
-            out_path (str, optional): Output path for the split tracks. Defaults to None (uses self.data_path).
-            remove (bool, optional): Whether to remove the original point files after splitting. Defaults to True.
-            desc (str, optional): Description of the operation. Defaults to 'Splitting tracks using spatiotemporal threshold'.
+            time (int, optional): Time threshold in seconds for splitting. Defaults
+                                to 3600 * 12 = 12 hours.
+            distance (int, float, optional): Distance threshold in the same units as
+                                            DataSet (default is 0.5, approx. 55km if
+                                            data is geographic). Defaults to 0.5.
+            ncores (int, optional): Number of cores to use for processing. Defaults
+                                    to 1.
+            out_path (str, optional): Output path for the split tracks. Defaults to
+                                    None (uses self.data_path).
+            remove (bool, optional): Whether to remove the original point files after
+                                    splitting. Defaults to True.
+            desc (str, optional): Description of the operation. Defaults to 'Splitting
+                                tracks using spatiotemporal threshold'.
 
         Returns:
             self: The Dataset instance.
@@ -582,42 +636,64 @@ class Dataset:
         **kwargs,
     ):
         """
-        Splits tracks using KMeans clustering based on specified features. This method attempts
-        to identify natural groupings of data points within tracks based on the specified features
-        and separates tracks accordingly. You can optionally output the error metrics using
-        return_error=True. This includes the inertia, Davies-Bouldin and Silhouette scores.
+        Splits tracks using KMeans clustering based on specified features. This
+        method attempts to identify natural groupings of data points within
+        tracks based on the specified features and separates tracks
+        accordingly. You can optionally output the error metrics using
+        return_error=True. This includes the inertia, Davies-Bouldin and
+        Silhouette scores.
 
-        If you pass a list/range of n_clusters to test, you can also specify the optimal_method kwarg
-        to choose the optimal number of clusters. Options are ['davies-bouldin', 'silhouette', 'knee'].
+        If you pass a list/range of n_clusters to test, you can also specify
+        the optimal_method kwarg to choose the optimal number of clusters.
+        Options are ['davies-bouldin', 'silhouette', 'knee'].
 
-        This is simply a wrapper over sklearn.cluster.KMeans, and will accept any kwarg that the original
-        class will accept.
+        This is simply a wrapper over sklearn.cluster.KMeans, and will accept
+        any kwarg that the original class will accept.
 
         https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html
 
-        If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
+        If you pass remove=True, it will delete *.points files as they are
+        split and saved into *.tracks files.
 
-        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
-        in the original self.data_path location.
+        If you pass a directory for the out_path kwarg, the *.tracks files will
+        be saved to this directory, and self.data_path will be changed as well.
+        If you pass None, it simply saves the *.tracks files in the original
+        self.data_path location.
 
         Args:
-            agents (list, optional): Specific list of agent ids to be processed. If None, processes all agents.
-            tracks (list, optional): Specific list of track ids to be processed. If None, processes all tracks.
-            n_clusters (int, list, range, optional): Int or list/range of numbers of clusters to try for determining the optimal number. Defaults to range(10).
-            feature_cols (list of str, optional): List of column names to be used as features for clustering. Defaults to ['X', 'Y'].
-            out_path (str, optional): Output path where the split tracks will be saved. If None, uses the current data path.
-            ncores (int, optional): Number of cores to use for parallel processing. Defaults to 1.
-            return_error (bool, optional): If True, returns error of the KMeans model for each number of clusters in n_clusters. Defaults to False.
-            remove (bool, optional): Whether to remove the original *.points file after splitting. Defaults to True.
-            desc (str, optional): Description of the operation. Defaults to 'Using KMeans clustering to split tracks'.
-            optimal_method (str, optional): Method to use for determining the optimal number of clusters. Defaults to 'davies-bouldin'.
-            **kwargs: Additional keyword arguments to pass to the KMeans clustering function.
+            agents (list, optional): Specific list of agent ids to be processed.
+                                    If None, processes all agents.
+            tracks (list, optional): Specific list of track ids to be processed.
+                                    If None, processes all tracks.
+            n_clusters (int, list, range, optional): Int or list/range of numbers
+                                                    of clusters to try for
+                                                    determining the optimal number.
+                                                    Defaults to range(10).
+            feature_cols (list of str, optional): List of column names to be used
+                                                as features for clustering.
+                                                Defaults to ['X', 'Y'].
+            out_path (str, optional): Output path where the split tracks will be
+                                    saved. If None, uses the current data path.
+            ncores (int, optional): Number of cores to use for parallel processing.
+                                    Defaults to 1.
+            return_error (bool, optional): If True, returns error of the KMeans
+                                        model for each number of clusters in
+                                        n_clusters. Defaults to False.
+            remove (bool, optional): Whether to remove the original *.points file
+                                    after splitting. Defaults to True.
+            desc (str, optional): Description of the operation. Defaults to
+                                'Using KMeans clustering to split tracks'.
+            optimal_method (str, optional): Method to use for determining the
+                                            optimal number of clusters. Defaults to
+                                            'davies-bouldin'.
+            **kwargs: Additional keyword arguments to pass to the KMeans clustering
+                    function.
 
         Returns:
             Depending on the value of return_error, either:
             - self: The Dataset instance, if return_error is False.
-            - tuple: (self, error), where error is a DataFrame of errors for each cluster number in n_clusters, if return_error is True.
+            - tuple: (self, error), where error is a DataFrame of errors for each
+                    cluster number in n_clusters, if return_error is True.
         """
         # set out path
         out_path = self._set_out_path(out_path)
@@ -684,32 +760,45 @@ class Dataset:
         **kwargs,
     ):
         """
-        Splits tracks using the DBSCAN clustering algorithm based on specified feature columns.
-        This method groups points into clusters based on their density, allowing for the identification
-        of varying densities within the data to effectively split tracks.
+        Splits tracks using the DBSCAN clustering algorithm based on specified
+        feature columns. This method groups points into clusters based on their
+        density, allowing for the identification of varying densities within
+        the data to effectively split tracks.
 
-        This is simply a wrapper over sklearn.cluster.DBSCAN, and will accept any kwargs the original
-        class accepts.
+        This is simply a wrapper over sklearn.cluster.DBSCAN, and will accept any
+        kwargs the original class accepts.
 
         https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html
 
-        If you pass remove=True, it will delete *.points files as they are split and saved into *.tracks files.
+        If you pass remove=True, it will delete *.points files as they are split
+        and saved into *.tracks files.
 
-        If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
-        and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
-        in the original self.data_path location.
+        If you pass a directory for the out_path kwarg, the *.tracks files will be
+        saved to this directory, and self.data_path will be changed as well. If you
+        pass None, it simply saves the *.tracks files in the original self.data_path
+        location.
 
         Args:
             agents (optional): Specific list of agent IDs to be processed.
             tracks (optional): Specific list of track IDs to be processed.
-            feature_cols (list of str, optional): Feature columns to be used for clustering. Defaults to ['X', 'Y'].
-            out_path (str, optional): Output path for the split tracks. If None, uses the current data path. Defaults to None.
-            ncores (int, optional): Number of cores to use for processing. Defaults to 1.
-            remove (bool, optional): Whether to remove the original point files after splitting. Defaults to True.
-            eps (float, optional): The maximum distance (normalized) between two samples for them to be considered as in the same neighborhood. Defaults to 0.5.
-            min_samples (int, optional): The number of samples in a neighborhood for a point to be considered as a core point. Defaults to 2.
-            desc (str, optional): Description of the operation. Defaults to 'Using DBSCAN clustering to split tracks'.
-            **kwargs: Additional keyword arguments passed to the sklearn.cluster.DBSCAN clustering algorithm.
+            feature_cols (list of str, optional): Feature columns to be used for
+                                                clustering. Defaults to ['X', 'Y'].
+            out_path (str, optional): Output path for the split tracks. If None,
+                                    uses the current data path. Defaults to None.
+            ncores (int, optional): Number of cores to use for processing.
+                                    Defaults to 1.
+            remove (bool, optional): Whether to remove the original point files
+                                    after splitting. Defaults to True.
+            eps (float, optional): The maximum distance (normalized) between two
+                                samples for them to be considered as in the same
+                                neighborhood. Defaults to 0.5.
+            min_samples (int, optional): The number of samples in a neighborhood
+                                        for a point to be considered as a core
+                                        point. Defaults to 2.
+            desc (str, optional): Description of the operation. Defaults to
+                                'Using DBSCAN clustering to split tracks'.
+            **kwargs: Additional keyword arguments passed to the sklearn.cluster.DBSCAN
+                    clustering algorithm.
 
         Returns:
             self: The Dataset instance.
@@ -744,10 +833,11 @@ class Dataset:
         desc="Repairing tracks using spatiotemporal threshold",
     ):
         """
-        Repairs tracks by connecting disjoint segments based on spatiotemporal thresholds.
-        This method is intended to identify and bridge gaps within tracks that are shorter than
-        specified time and distance thresholds. It is useful for reconstructing tracks that may
-        have been erroneously split due to missing data or other anomalies.
+        Repairs tracks by connecting disjoint segments based on spatiotemporal
+        thresholds. This method is intended to identify and bridge gaps within
+        tracks that are shorter than specified time and distance thresholds. It
+        is useful for reconstructing tracks that may have been erroneously
+        split due to missing data or other anomalies.
 
         This function assumes tracks have already been split by some other method.
 
@@ -792,9 +882,10 @@ class Dataset:
         self, agents=None, desc="Removing agents from Dataset", ncores=1
     ):
         """
-        Removes specified agents from the Dataset. This operation is designed to
-        selectively remove agents based on their identifiers, facilitating data management
-        and cleaning processes. Get rid of data you don't need anymore!
+        Removes specified agents from the Dataset. This operation is designed
+        to selectively remove agents based on their identifiers, facilitating
+        data management and cleaning processes. Get rid of data you don't need
+        anymore!
 
         Args:
             agents (list, optional): List of agent ids to be removed. If None, it assumes all agents.
@@ -820,9 +911,10 @@ class Dataset:
         desc="Removing tracks from Dataset",
     ):
         """
-        Removes specified tracks from the Dataset. This operation is designed to
-        selectively remove tracks based on their identifiers, facilitating data management
-        and cleaning processes. Get rid of data you don't need anymore!
+        Removes specified tracks from the Dataset. This operation is designed
+        to selectively remove tracks based on their identifiers, facilitating
+        data management and cleaning processes. Get rid of data you don't need
+        anymore!
 
         Args:
             tracks (list, optional): List of tracks ids to be removed. If None, it assumes all tracks.
@@ -851,9 +943,9 @@ class Dataset:
         self, agents=None, ncores=1, desc="Getting track split data"
     ):
         """
-        Retrieves data related to the gaps between tracks. This function is useful for analyzing
-        how tracks have been divided spatiotemporally, and potentially isolating a list of
-        tracks to rejoin.
+        Retrieves data related to the gaps between tracks. This function is
+        useful for analyzing how tracks have been divided spatiotemporally, and
+        potentially isolating a list of tracks to rejoin.
 
         Args:
             agents (list, optional): List of agent ids for which track split data will be retrieved.
@@ -876,9 +968,9 @@ class Dataset:
         df["Connect"] = False
         return df
 
-    ############################################################################
+    ###########################################################################
     # METADATA
-    ############################################################################
+    ###########################################################################
 
     def check_meta(self, meta):
         # try to fetch the meta if already exists
@@ -899,10 +991,10 @@ class Dataset:
         self, agents_only=False, ncores=1, desc="Refreshing metadata"
     ):
         """
-        Refreshes the metadata associated with the Dataset. This involves updating the
-        dataset.db, agent.db, and track.db files stored in the Dataset.data_path folder.
-        If these files do not exist (i.e. Dataset.refresh_meta has never been run yet),
-        it will created them.
+        Refreshes the metadata associated with the Dataset. This involves
+        updating the dataset.db, agent.db, and track.db files stored in the
+        Dataset.data_path folder. If these files do not exist (i.e.
+        Dataset.refresh_meta has never been run yet), it will created them.
 
         You only need to do this if you want the .db files to be updated, which is only
         necessary if you need an updated output for Dataset.meta, Dataset.agents, or Dataset.tracks.
@@ -974,9 +1066,9 @@ class Dataset:
         self, meta_cols, agents=None, ncores=1, desc="Making meta mappers"
     ):
         """
-        Creates a metadata mapper dictionary based on the meta_cols provided. This mapper can be used to
-        translate or map metadata values, potentially simplifying data analysis and manipulation
-        tasks.
+        Creates a metadata mapper dictionary based on the meta_cols provided.
+        This mapper can be used to translate or map metadata values,
+        potentially simplifying data analysis and manipulation tasks.
 
         Args:
             meta_cols (list): The meta_cols used to create the meta mapper.
@@ -1019,9 +1111,9 @@ class Dataset:
         desc="Dropping meta from agents",
     ):
         """
-        Drops specified metadata from agents. This function allows for selective removal of metadata
-        associated with certain agents, potentially for data cleaning, or to reduce
-        dataset size.
+        Drops specified metadata from agents. This function allows for
+        selective removal of metadata associated with certain agents,
+        potentially for data cleaning, or to reduce dataset size.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
@@ -1072,10 +1164,11 @@ class Dataset:
         desc="Mapping metadata to agent",
     ):
         """
-        Applies a mapping function to transform metadata of selected agents. This can be used to
-        normalize, categorize, or otherwise process metadata fields for consistency, analysis,
-        or data cleaning purposes. The transformation is defined by the `mapper` dictionary which specifies
-        how input metadata values are mapped to output values.
+        Applies a mapping function to transform metadata of selected agents.
+        This can be used to normalize, categorize, or otherwise process
+        metadata fields for consistency, analysis, or data cleaning purposes.
+        The transformation is defined by the `mapper` dictionary which
+        specifies how input metadata values are mapped to output values.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
@@ -1130,10 +1223,11 @@ class Dataset:
         desc="Making data mappers",
     ):
         """
-        Creates a mapping for data columns to facilitate data transformation. This function
-        can be particularly useful for preparing data for machine learning models, data visualization,
-        or statistical analysis by mapping raw data into a more useful format, or to just simply
-        clean or categorize data into a new, easier field to work with.
+        Creates a mapping for data columns to facilitate data transformation.
+        This function can be particularly useful for preparing data for machine
+        learning models, data visualization, or statistical analysis by mapping
+        raw data into a more useful format, or to just simply clean or
+        categorize data into a new, easier field to work with.
 
         Args:
             data_cols (list): The names of the data columns for which the mappers will
@@ -1181,9 +1275,9 @@ class Dataset:
         desc="Dropping dynamic data from agents",
     ):
         """
-        Drops specified dynamic data from agents. This function allows for selective removal of data
-        associated with certain agents, potentially for data cleaning, or to reduce
-        dataset size.
+        Drops specified dynamic data from agents. This function allows for
+        selective removal of data associated with certain agents, potentially
+        for data cleaning, or to reduce dataset size.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
@@ -1235,10 +1329,11 @@ class Dataset:
         desc="Mapping agent dynamic data",
     ):
         """
-        Applies a mapping function to transform dynamic data of selected agents/tracks. This can be used to
-        normalize, categorize, or otherwise process data fields for consistency, analysis,
-        or data cleaning purposes. The transformation is defined by the mapper dictionary which specifies
-        how input data values are mapped to output values.
+        Applies a mapping function to transform dynamic data of selected
+        agents/tracks. This can be used to normalize, categorize, or otherwise
+        process data fields for consistency, analysis, or data cleaning
+        purposes. The transformation is defined by the mapper dictionary which
+        specifies how input data values are mapped to output values.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
@@ -1297,8 +1392,8 @@ class Dataset:
         desc="Mapping agent dynamic data to coded boolean arrays",
     ):
         """
-        Applies a mapping function to transform dynamic data of selected agents/tracks into boolean "Code"
-        columns.
+        Applies a mapping function to transform dynamic data of selected
+        agents/tracks into boolean "Code" columns.
 
         For this to work, the values in the data_mappers dictionaries must all be integer values.
         The algorithm will make a coded boolean column for each integer in the dictionary, True
@@ -1360,9 +1455,9 @@ class Dataset:
         self = self._update_meta(out_path, self.meta)
         return self
 
-    ############################################################################
+    ###########################################################################
     # FETCHERS
-    ############################################################################
+    ###########################################################################
 
     # make deepcopy
     def copy(self):
@@ -1546,8 +1641,9 @@ class Dataset:
         desc="Converting tracks to DataFrame",
     ):
         """
-        Converts agent/track data into a pandas DataFrame. This method allows for simple integration
-        of pandas into data processing workflows, and leveraging the pandas framework and built-in tools.
+        Converts agent/track data into a pandas DataFrame. This method allows
+        for simple integration of pandas into data processing workflows, and
+        leveraging the pandas framework and built-in tools.
 
         This function converts all of the requested agents/tracks into a DataFrame containing the points
         making up this data. Each row/point gets tagged with the Agent ID, Track ID, and Ping ID for
@@ -1584,9 +1680,10 @@ class Dataset:
 
     def to_dask_bag(self, agents=None):
         """
-        Converts the dataset for specified agents into a Dask Bag, enabling parallel processing and analysis
-        of large datasets that do not fit into memory. Dask Bags are well-suited for working with unstructured
-        data or data that can be processed in a sequence of operations.
+        Converts the dataset for specified agents into a Dask Bag, enabling
+        parallel processing and analysis of large datasets that do not fit into
+        memory. Dask Bags are well-suited for working with unstructured data or
+        data that can be processed in a sequence of operations.
 
         This can be used to leverage Dask for parallel processing of any custom functionality.
 
@@ -1608,9 +1705,9 @@ class Dataset:
         bag = db.from_sequence(pkl_files)
         return bag.map(utils.read_pkl)
 
-    ############################################################################
+    ###########################################################################
     # GEOMETRIC
-    ############################################################################
+    ###########################################################################
 
     def reproject_crs(
         self,
@@ -1622,7 +1719,8 @@ class Dataset:
         desc="Reprojecting CRS",
     ):
         """
-        Reprojects the coordinate reference system (CRS) of the dataset's geographic data to a new CRS.
+        Reprojects the coordinate reference system (CRS) of the dataset's
+        geographic data to a new CRS.
 
         The target CRS can be a EPSG code, WKT string, pyproj.CRS object, etc.
 
@@ -1689,10 +1787,11 @@ class Dataset:
         desc="Resampling track spacing",
     ):
         """
-        Resamples the points of tracks to a specified spacing. This is useful for standardizing
-        the distance between consecutive points in track data, facilitating analyses that require uniform
-        spatial intervals. The resampling process can either interpolate or decimate points to achieve the
-        desired spacing.
+        Resamples the points of tracks to a specified spacing. This is useful
+        for standardizing the distance between consecutive points in track
+        data, facilitating analyses that require uniform spatial intervals. The
+        resampling process can either interpolate or decimate points to achieve
+        the desired spacing.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
@@ -1745,10 +1844,11 @@ class Dataset:
         desc="Resampling track timing",
     ):
         """
-        Resamples the points of tracks to a specified temporal spacing. This is useful for standardizing
-        the timing between consecutive points in track data, facilitating analyses that require uniform
-        temporal intervals. The resampling process can either interpolate or decimate points to achieve the
-        desired temporal spacing.
+        Resamples the points of tracks to a specified temporal spacing. This is
+        useful for standardizing the timing between consecutive points in track
+        data, facilitating analyses that require uniform temporal intervals.
+        The resampling process can either interpolate or decimate points to
+        achieve the desired temporal spacing.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
         and self.data_path will be changed as well. If you pass None, it simply saves the *.tracks files
@@ -1865,8 +1965,9 @@ class Dataset:
         desc="Computing coursing",
     ):
         """
-        Computes the coursing of tracks based on the direction travelled between points. This gets added
-        as a "Coursing" column in the track data.
+        Computes the coursing of tracks based on the direction travelled
+        between points. This gets added as a "Coursing" column in the track
+        data.
 
         The method kwarg must be one of ['forward', 'middle', 'backward'] and corresponds to which pairs of
         points to use for determining coursing values, and how to fill the remaining point.
@@ -1932,8 +2033,9 @@ class Dataset:
         desc="Computing turning rate",
     ):
         """
-        Computes the turning rate of tracks based on the change in coursing between points. This gets added
-        as a "Turning Rate" column in the track data.
+        Computes the turning rate of tracks based on the change in coursing
+        between points. This gets added as a "Turning Rate" column in the track
+        data.
 
         This method assumes that there is accurate coursing data available for the tracks. If this is
         not the case, you should run the Dataset.compute_coursing function first.
@@ -2002,8 +2104,8 @@ class Dataset:
         desc="Computing speed",
     ):
         """
-        Computes the speed of tracks based on the distance/time between points. This gets added
-        as a "Speed" column in the track data.
+        Computes the speed of tracks based on the distance/time between points.
+        This gets added as a "Speed" column in the track data.
 
         The method kwarg must be one of ['forward', 'middle', 'backward'] and corresponds to which pairs of
         points to use for determining speed values, and how to fill the remaining point.
@@ -2069,8 +2171,8 @@ class Dataset:
         desc="Computing acceleration",
     ):
         """
-        Computes the acceleration of tracks based on the distance/time between points. This gets added
-        as an "Acceleration" column in the track data.
+        Computes the acceleration of tracks based on the distance/time between
+        points. This gets added as an "Acceleration" column in the track data.
 
         This method assumes that there is accurate speed data available for the tracks. If this is
         not the case, you should run the Dataset.compute_speed method first.
@@ -2139,8 +2241,8 @@ class Dataset:
         desc="Computing timestep size",
     ) -> "Dataset":
         """
-        Computes the timestep size based on the timestamp of consequtive points in a track. This gets added
-        as an "Timestep" column in the track data.
+        Computes the timestep size based on the timestamp of consequtive points
+        in a track. This gets added as an "Timestep" column in the track data.
 
         The method kwarg must be one of ['forward', 'backward'] and corresponds to which pairs of
         points to use for calculating timestep values, and how to fill the remaining point.
@@ -2259,8 +2361,8 @@ class Dataset:
         desc="Computing radius of curvature",
     ):
         """
-        Computes the radius of curvature for each point along tracks. This gets added
-        as a "Radius of Curvature" column in the track data.
+        Computes the radius of curvature for each point along tracks. This gets
+        added as a "Radius of Curvature" column in the track data.
 
         This is very useful for isolating parts of tracks where agents are turning.
 
@@ -2317,7 +2419,8 @@ class Dataset:
         desc="Computing sinuosity",
     ):
         """
-        Computes the sinuosity for each point along tracks. This gets added as a "Sinuosity" column in the track data.
+        Computes the sinuosity for each point along tracks. This gets added as
+        a "Sinuosity" column in the track data.
 
         This algorithm works by looking at a central middle point, as well as a user-defined window of points centered
         at this point. The sinuosity is then calculated as the ratio between total length and effective length
@@ -2376,7 +2479,8 @@ class Dataset:
         desc="Smoothing sharp corners",
     ):
         """
-        Smooths sharp corners/turns in tracks using a iterative weighted averaging technique.
+        Smooths sharp corners/turns in tracks using a iterative weighted
+        averaging technique.
 
         This is useful for smoothing jagged corners/turns in data where the quality of the data
         around turns is important, or simply where the resolution of data around turns is poor and you
@@ -2499,7 +2603,8 @@ class Dataset:
         desc="Extracting characteristic tracks",
     ):
         """
-        Based on "Spatial Generalization and Aggregation of Massive Movement Data", Adrienko & Adrienko (2010).
+        Based on "Spatial Generalization and Aggregation of Massive Movement
+        Data", Adrienko & Adrienko (2010).
 
         Paper here:
         http://geoanalytics.net/and/papers/tvcg11.pdf
@@ -2586,7 +2691,8 @@ class Dataset:
         desc="Simplifying stops along tracks",
     ):
         """
-        Simplifies and reduces the number of points that define stop events along tracks.
+        Simplifies and reduces the number of points that define stop events
+        along tracks.
 
         This can be useful for simplifying large amounts of unnecessary data into key
         points such as start/end points, which maintain the critical information of the stop
@@ -2647,8 +2753,9 @@ class Dataset:
         desc="Imprinting geometry into tracks",
     ):
         """
-        Imprints a specified geometric shape onto track data. Shape must be a shapely LineString,
-        MultiLineString, Polygon, or MultiPolygon. The shape must be in the same CRS as the data.
+        Imprints a specified geometric shape onto track data. Shape must be a
+        shapely LineString, MultiLineString, Polygon, or MultiPolygon. The
+        shape must be in the same CRS as the data.
 
         This is very useful for things like clipping tracks, isolating parts of tracks inside of polygons,
         or getting an accurate estimate of time spent inside a polygon. This may also be useful if you simply
@@ -2714,9 +2821,10 @@ class Dataset:
         desc="Interpolating raster to tracks",
     ):
         """
-        Interpolates values from a raster onto the track points, effectively assigning raster-based
-        values (e.g., elevation, temperature) to each point along the tracks. This method allows for the enrichment
-        of track data with additional environmental or spatial information.
+        Interpolates values from a raster onto the track points, effectively
+        assigning raster-based values (e.g., elevation, temperature) to each
+        point along the tracks. This method allows for the enrichment of track
+        data with additional environmental or spatial information.
 
         Here, there is no temporal aspect to the interpolation. The raster is simply interpolated to all
         points on the tracks.
@@ -2795,9 +2903,10 @@ class Dataset:
         desc="Calculating spatiotemporal encounters",
     ):
         """
-        Calculates spatiotemporal encounters between two datasets. Identifies instances where tracks
-        come within a specified distance of each other within certain difference in time. This function can be
-        used for analyzing interactions or proximities between tracks.
+        Calculates spatiotemporal encounters between two datasets. Identifies
+        instances where tracks come within a specified distance of each other
+        within certain difference in time. This function can be used for
+        analyzing interactions or proximities between tracks.
 
         By default, dataset=None is passed, which forces the second dataset to be the same as the first. Meaning,
         the default is to find encounters by comparing a dataset to itself; this is likely the most common application.
@@ -2924,8 +3033,10 @@ class Dataset:
         desc="Calculating intersections",
     ):
         """
-        Calculates intersections between two datasets. Identifies instances where tracks intersect with other tracks,
-        within certain difference in time. This function can be  used for analyzing interactions or proximities between tracks.
+        Calculates intersections between two datasets. Identifies instances
+        where tracks intersect with other tracks, within certain difference in
+        time. This function can be  used for analyzing interactions or
+        proximities between tracks.
 
         By default, dataset=None is passed, which forces the second dataset to be the same as the first. Meaning,
         the default is to find intersections by comparing a dataset to itself; this is likely the most common application.
@@ -3049,9 +3160,10 @@ class Dataset:
         desc="Calculating proximities to object",
     ):
         """
-        Calculates the minimum proximity of tracks to a specified geometric object. This object can be a
-        shapely Point, MultiPoint, LineString, MultiLineString, Polygon, or MultiPolygon. It can also be
-        a Nx2 numpy array containing x,y points that represent the former.
+        Calculates the minimum proximity of tracks to a specified geometric
+        object. This object can be a shapely Point, MultiPoint, LineString,
+        MultiLineString, Polygon, or MultiPolygon. It can also be a Nx2 numpy
+        array containing x,y points that represent the former.
 
         The minimum proxixity between tracks and the object may not necessarily be points that fall on either of
         the original shapes. For example, if the object is a point, the closest proximity may be somewhere in the
@@ -3258,9 +3370,10 @@ class Dataset:
         desc="Calculating lateral distributions at slices",
     ):
         """
-        Analyzes the lateral distribution of tracks across specified slices/cross-sections of the data.
-         his method can also split tracks going to/from the direction along start to end to separate
-        opposing "lanes" of traffic.
+        Analyzes the lateral distribution of tracks across specified
+        slices/cross-sections of the data. his method can also split tracks
+        going to/from the direction along start to end to separate opposing
+        "lanes" of traffic.
 
         Slices are taken along a line from start to end, with either n_slices or spacing defining where the slices fall.
         You can specify the lateral distribution bin width, and whether to return a relative (0-1) or absolute probability
@@ -3367,9 +3480,11 @@ class Dataset:
         ncores=1,
     ):
         """
-        Computes the time spent and distance travelled by tracks inside a specified polygonal area. This function is useful
-        for analyzing spatial usage, such as habitat utilization, restricted area compliance, or general movement patterns
-        within specific geographic boundaries. The analysis can help identify which agents or tracks spend time in the
+        Computes the time spent and distance travelled by tracks inside a
+        specified polygonal area. This function is useful for analyzing spatial
+        usage, such as habitat utilization, restricted area compliance, or
+        general movement patterns within specific geographic boundaries. The
+        analysis can help identify which agents or tracks spend time in the
         area of interest and quantify that time.
 
         This is best used in conjunction with Dataset.imprint_geometry, as it can imprint the polygon outline into
@@ -3427,10 +3542,13 @@ class Dataset:
         desc="Generating flow map from polygons",
     ):
         """
-        Generates a flow map based on movement or connectivity between specified polygonal areas. This function is
-        useful for visualizing movement patterns, such as migration routes, traffic flows, or general movements of
-        agents through different regions. The flow map can highlight areas of high connectivity or movement concentration,
-        providing insights into spatial dynamics within the dataset from a macroscopic perspective.
+        Generates a flow map based on movement or connectivity between
+        specified polygonal areas. This function is useful for visualizing
+        movement patterns, such as migration routes, traffic flows, or general
+        movements of agents through different regions. The flow map can
+        highlight areas of high connectivity or movement concentration,
+        providing insights into spatial dynamics within the dataset from a
+        macroscopic perspective.
 
         This method assumes that you have already ran the Dataset.classify_in_polygons method to classify the
         tracks inside the polygons GeoDataFrame. The flow_col kwarg is the column that was produced when running
@@ -3512,8 +3630,8 @@ class Dataset:
         desc="Generating flow map from polygons",
     ):
         """
-        This works the same way as Dataset.generate_flow_map, but instead the tracks are actually
-        reduced to their flow map representation.
+        This works the same way as Dataset.generate_flow_map, but instead the
+        tracks are actually reduced to their flow map representation.
 
         This method assumes that you have already ran the Dataset.classify_in_polygons method to classify the
         tracks inside the polygons GeoDataFrame. The flow_col kwarg is the column that was produced when running
@@ -3580,9 +3698,9 @@ class Dataset:
         **kwargs,
     ):
         """
-        Routes tracks through a cost raster using a least cost path algorithm. This is a thin wrapper
-        over skimage.graph.route_through_array, and will accept any of the kwargs the original function
-        will accept:
+        Routes tracks through a cost raster using a least cost path algorithm.
+        This is a thin wrapper over skimage.graph.route_through_array, and will
+        accept any of the kwargs the original function will accept:
 
         https://scikit-image.org/docs/stable/api/skimage.graph.html#skimage.graph.route_through_array
 
@@ -3662,15 +3780,15 @@ class Dataset:
         self = self._update_meta(out_path, self.meta)
         return self
 
-    ############################################################################
+    ###########################################################################
     # CLUSTERING
-    ############################################################################
+    ###########################################################################
 
     # def MiniBatchKMeans(self, ncores)
 
-    ############################################################################
+    ###########################################################################
     # CLASSIFYING
-    ############################################################################
+    ###########################################################################
 
     def classify_in_polygon(
         self,
@@ -3682,8 +3800,9 @@ class Dataset:
         desc="Classifying tracks inside polygon",
     ):
         """
-        Classifies points along tracks True if they fall on/within a specified polygon,
-        and False if they do not. This classification is stored in a boolean column in the track data.
+        Classifies points along tracks True if they fall on/within a specified
+        polygon, and False if they do not. This classification is stored in a
+        boolean column in the track data.
 
         The polygon must be a shapely Polygon, or a Nx2 array representing the outline of a polygon.
 
@@ -3798,7 +3917,9 @@ class Dataset:
         desc: str = "Classifying tracks toward point",
     ):
         """
-        Classifies tracks True if they head towards a given point, and False if they do not. This classification is stored in a boolean column in the track data.
+        Classifies tracks True if they head towards a given point, and False if
+        they do not. This classification is stored in a boolean column in the
+        track data.
 
         Args:
             point (Point): The Point must be a shapely Point.
@@ -3844,9 +3965,11 @@ class Dataset:
         desc="Classifying tracks by speed threshold",
     ):
         """
-        Classifies points on tracks based on a speed threshold, marking them according to whether their speeds are
-        higher or lower than the specified threshold. This function is useful for identifying high-speed movements,
-        slow-paced activities, or generally categorizing tracks by their speed characteristics for further analysis.
+        Classifies points on tracks based on a speed threshold, marking them
+        according to whether their speeds are higher or lower than the
+        specified threshold. This function is useful for identifying high-speed
+        movements, slow-paced activities, or generally categorizing tracks by
+        their speed characteristics for further analysis.
 
         This classification is stored in a boolean Code column.
 
@@ -3910,10 +4033,12 @@ class Dataset:
         desc="Classifying turning tracks",
     ):
         """
-        Classifies points on tracks based on their turning rate, identifying parts of tracks that exhibit turning behavior above
-        a specified threshold. This can be particularly useful for understanding navigational patterns,
-        identifying areas with high maneuvering activity, or studying the behavior of moving agents in response
-        to environmental features or obstacles.
+        Classifies points on tracks based on their turning rate, identifying
+        parts of tracks that exhibit turning behavior above a specified
+        threshold. This can be particularly useful for understanding
+        navigational patterns, identifying areas with high maneuvering
+        activity, or studying the behavior of moving agents in response to
+        environmental features or obstacles.
 
         This classification is stored in a boolean Code column.
 
@@ -3960,8 +4085,9 @@ class Dataset:
         desc="Classifying tracks by speed threshold in polygon",
     ) -> "Dataset":
         """
-        This is simply a combination of Dataset.classify_in_polygon and Dataset.classify_speed.
-        This classifies points on tracks if they meet or don't meet a speed threshold inside of a given polygon.
+        This is simply a combination of Dataset.classify_in_polygon and
+        Dataset.classify_speed. This classifies points on tracks if they meet
+        or don't meet a speed threshold inside of a given polygon.
 
         Please see their documentation for more details.
 
@@ -4015,7 +4141,8 @@ class Dataset:
         desc="Classifying tracks by trip",
     ):
         """
-        Classifies tracks if they do a trip between two polygons (either direction).
+        Classifies tracks if they do a trip between two polygons (either
+        direction).
 
         The track must start/end in poly1/poly2. Only the first and last points on the track are used for
         this classification.
@@ -4071,7 +4198,8 @@ class Dataset:
         desc="Classifying tracks touching object",
     ):
         """
-        Classifies tracks based on whether they touch or intersect a specified geometric object.
+        Classifies tracks based on whether they touch or intersect a specified
+        geometric object.
 
         The geom kwarg must be a shapely LineString, MultiLineString, Polygon, or MultiPolygon.
 
@@ -4125,7 +4253,8 @@ class Dataset:
         desc="Classifying stopped tracks",
     ):
         """
-        Classifies points along tracks where the agents have stopped, based on a specified speed threshold and minimum stop duration.
+        Classifies points along tracks where the agents have stopped, based on
+        a specified speed threshold and minimum stop duration.
 
         If points along tracks meet the stopping thresholds, the resulting boolean Code column will be True, otherrwise False.
 
@@ -4176,7 +4305,8 @@ class Dataset:
         meta="Custom classifier",
     ):
         """
-        Applies a custom classification to tracks based on an input pandas DataFrame.
+        Applies a custom classification to tracks based on an input pandas
+        DataFrame.
 
         This DataFrame must have an index consisting of Track IDs, and a "Value" column consisting
         of True/False values to classify the tracks.
@@ -4212,7 +4342,7 @@ class Dataset:
         return self
 
 
-################################################################################
+###############################################################################
 
 
 def _meta_to_agents(meta, crs):
@@ -4287,4 +4417,4 @@ def _refresh_meta(agents_only, file):
     return meta, meta_cols, data_cols
 
 
-################################################################################
+###############################################################################

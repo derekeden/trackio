@@ -1,4 +1,4 @@
-################################################################################
+###############################################################################
 
 import multiprocessing as mp
 import os
@@ -18,10 +18,9 @@ from .maps import map_columns
 
 GREEN = "\033[92m"
 ENDC = "\033[0m"  # for tqdm bar
-
-################################################################################
-
 must_cols = ["Time", "X", "Y"]
+
+###############################################################################
 
 
 def group_points(
@@ -268,7 +267,8 @@ def clip_to_box(
     pattern="_clipped",
 ):
     """
-    Clips data in a list of csv files to a user defined box, writes to clipped csv files.
+    Clips data in a list of csv files to a user defined box, writes to clipped
+    csv files.
 
     Args:
         files: List of file paths to clip
@@ -317,7 +317,8 @@ def clip_to_polygon(
     pattern="_clipped",
 ):
     """
-    Clips data in a list of csv files to a user defined polygon, writes to clipped csv files.
+    Clips data in a list of csv files to a user defined polygon, writes to
+    clipped csv files.
 
     Args:
         files: List of file paths to clip
@@ -560,4 +561,4 @@ def remove_tracks(out_path, args):
         utils.save_pkl(out_file, agent)
 
 
-################################################################################
+###############################################################################

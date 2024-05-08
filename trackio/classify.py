@@ -1,4 +1,4 @@
-################################################################################
+###############################################################################
 
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ from shapely.geometry import Point
 
 from .utils import collect_agent_pkls, first_nonzero, save_pkl
 
-################################################################################
+###############################################################################
 
 
 def classify_in_polygon(polygon, edges, code, args):
@@ -187,7 +187,9 @@ def _classify_speed_inpoly(
     speed: float,
     higher: bool,
 ) -> np.ndarray[bool]:
-    """Classify if datapoints lie within a given polygon and its speed is higher or lower than a certain velocity.
+    """
+    Classify if datapoints lie within a given polygon and its speed is higher
+    or lower than a certain velocity.
 
     Args:
         x (np.ndarray[float]): X-coordinates of the datapoints.
@@ -195,11 +197,13 @@ def _classify_speed_inpoly(
         speeds (np.ndarray[float]): The speeds pf the datapoints
         poly (np.ndarray): The polygon coordinates by which to classify.
         edges (tuple): The edges of the polygon.
-        speed (float):  The speed by which to classify.
-        higher (bool): If True, speed of datapoint needs to be higher than the input speed.
+        speed (float): The speed by which to classify.
+        higher (bool): If True, speed of datapoint needs to be higher
+                       than the input speed.
 
     Returns:
-        np.ndarray[bool]: Boolean array with true if classification query is correct and false if not.
+        np.ndarray[bool]: Boolean array with true if classification query is
+                          correct and false if not.
     """
     isin = inpoly2(np.column_stack((x, y)), poly, edges, ftol=1e-8)
     if higher:
@@ -216,15 +220,20 @@ def classify_speed_in_polygon(
     code: int,
     args: list,
 ):
-    """Classify if datapoints lie within a given polygon and its speed is higher or lower than a certain velocity.
+    """
+    Classify if datapoints lie within a given polygon and its speed is higher
+    or lower than a certain velocity.
 
     Args:
         speed (float): The speed by which to classify.
         poly (np.ndarray): The polygon coordinates by which to classify.
         edges (tuple): The edges of the polygon.
-        higher (bool): If True, speed of datapoint needs to be higher than the input speed.
-        code (int): The numer of the code column to which the classification bool will be written.
-        args (list): Essentially the binary file names and track list if specified.
+        higher (bool): If True, speed of datapoint needs to be higher than
+                       the input speed.
+        code (int): The numer of the code column to which the classification
+                    bool will be written.
+        args (list): Essentially the binary file names and track list if
+                     specified.
     """
     # split args
     pkl_files, tracks = args
@@ -408,4 +417,4 @@ def classify_custom(values, code, args):
     save_pkl(pkl_files[0], agent)
 
 
-################################################################################
+###############################################################################

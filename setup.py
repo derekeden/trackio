@@ -23,6 +23,7 @@ sp.run(
 )
 sp.run(["pip", "install", "./trackio/supporting/inpoly-python-0.2.0.zip"])
 
+# run step
 setup(
     name="trackio",
     version="0.1.0",

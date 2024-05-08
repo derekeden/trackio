@@ -1,3 +1,5 @@
+###############################################################################
+
 import os
 
 import numpy as np
@@ -9,6 +11,8 @@ from shapely.geometry import LineString, MultiLineString
 
 from .Agent import gen_track_meta
 from .utils import collect_agent_pkls
+
+###############################################################################
 
 
 def to_track_gdf(agent, track, tid, code):
@@ -190,7 +194,8 @@ def create_blank_raster(
     out_file, crs, grid={"x0": 0, "y0": 0, "nx": 1, "ny": 1, "dx": 1, "dy": 1}
 ):
     """
-    Creates a blank raster file with specified dimensions, resolution, and coordinate reference system (CRS).
+    Creates a blank raster file with specified dimensions, resolution, and
+    coordinate reference system (CRS).
 
     Here, CRS can be a EPSG code, WKT string, proj4 string, pyproj.CRS object, etc.
 
@@ -257,7 +262,8 @@ def create_blank_raster(
 
 def rasterize(shp_file, ras_file, out_file, attribute=None):
     """
-    Rasterizes a shapefile/gpkg/geojson onto an existing raster file saving the result to a new raster file.
+    Rasterizes a shapefile/gpkg/geojson onto an existing raster file saving the
+    result to a new raster file.
 
     If attribute is None, the resulting raster contains track counts that touch each pixel.
 
@@ -319,4 +325,4 @@ def rasterize(shp_file, ras_file, out_file, attribute=None):
     output = None
 
 
-################################################################################
+###############################################################################

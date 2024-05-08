@@ -1,4 +1,4 @@
-################################################################################
+###############################################################################
 
 import multiprocessing as mp
 import pickle as pkl
@@ -27,8 +27,7 @@ from .Agent import Agent
 GREEN = "\033[92m"
 ENDC = "\033[0m"  # for tqdm bar
 
-
-################################################################################
+###############################################################################
 
 
 def append_pkl(out_file, pkl_obj):
@@ -228,7 +227,9 @@ def gdf_to_df(gdf):
 def df_to_gdf(
     df: DataFrame, x_dimension: str, y_dimension: str, crs: str
 ) -> GeoDataFrame:
-    """Converts a DataFrame to a GeoDataFrame. The "geometry" column is appended after the last column.
+    """
+    Converts a DataFrame to a GeoDataFrame. The "geometry" column is appended
+    after the last column.
 
     Args:
         df (DataFrame): Pandas DataFrame.
@@ -334,4 +335,4 @@ def create_voronoi(centroids, buffer=500000):
     return voronoi
 
 
-################################################################################
+###############################################################################
