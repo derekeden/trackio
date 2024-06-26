@@ -311,18 +311,19 @@ def classify_trip(poly1, edges1, poly2, edges2, code, args):
     save_pkl(pkl_files[0], agent)
 
 
-def _classify_touches(x, y, geom):
-    if len(x) == 1:
-        return np.array([False] * len(x))
+def _classify_touching(ls, geom, npts, segments=False):
+    if segments:
+        result = ls.apply(lambda x: geom.intersects(x)).values
+        result = np.concatenate([[False], result])
+        return result
     else:
-        ls = geometry.LineString(zip(x, y))
-    if geom.intersects(ls):
-        return np.array([True] * len(x))
-    else:
-        return np.array([False] * len(x))
+        if geom.intersects(ls):
+            return np.array([True] * npts)
+        else:
+            return np.array([False] * npts)
 
 
-def classify_touching(geom, code, args):
+def classify_touching(geom, code, segments, args):
     # split args
     pkl_files, tracks = args
     # read split agent file
@@ -341,7 +342,19 @@ def classify_touching(geom, code, args):
         track = agent.tracks[tid]
         x = track["X"].values
         y = track["Y"].values
-        result = _classify_touches(x, y, geom)
+        if len(x) == 1:
+            result = [False]
+        elif segments:
+            ls = pd.Series(
+                [
+                    geometry.LineString([[x[i], y[i]], [x[i - 1], y[i - 1]]])
+                    for i in range(1, len(x))
+                ]
+            )
+            result = _classify_touching(ls, geom, len(x), segments)
+        else:
+            ls = geometry.LineString(zip(x, y))
+            result = _classify_touching(ls, geom, len(x), segments)
         track.loc[:, f"Code{code}"] = result
     # save the file
     save_pkl(pkl_files[0], agent)
