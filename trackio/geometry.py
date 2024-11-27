@@ -26,17 +26,17 @@ def interpolate_dynamic_data(track, newx, oldx):
     dtypes = track.dtypes
     # loop over columns
     for col in track.columns:
+        # if boolean
+        if pd.api.types.is_bool_dtype(dtypes[col]):
+            out[col] = np.interp(newx, oldx, track[col].values).astype(bool)
         # if numeric
-        if pd.api.types.is_numeric_dtype(dtypes[col]):
+        elif pd.api.types.is_numeric_dtype(dtypes[col]):
             out[col] = np.interp(newx, oldx, track[col].values)
         # if datetime
         elif col == "Time":
             out[col] = pd.to_datetime(
                 np.interp(newx, oldx, track[col].astype(np.int64))
             )
-        # if boolean
-        elif pd.api.types.is_bool_dtype(dtypes[col]):
-            out[col] = np.interp(newx, oldx, track[col].values).astype(bool)
         # if string
         else:
             # map to ints

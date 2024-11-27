@@ -34,9 +34,9 @@ setup(
     packages=find_packages(),
     install_requires=[
         "Cython",
-        "numpy",
-        "scipy",
-        "pandas",
+        "numpy<2.0",
+        "scipy==1.12.0",
+        "pandas==2.2.1",
         "geopandas",
         "tqdm",
         "more_itertools",
@@ -45,7 +45,7 @@ setup(
         "scikit-learn",
         "scikit-image",
         "kneed",
-        "dask",
+        "dask==2024.2.1",
     ],
 )
 
