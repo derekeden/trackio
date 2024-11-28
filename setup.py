@@ -6,7 +6,9 @@ from setuptools import find_packages, setup
 
 ################################################################################
 
-# manually install the wheels first
+# install numpy before rasterio to ensure <2.0
+sp.run(["pip", "install", "numpy<2.0"])
+# installed prepackaged wheels
 sp.run(
     [
         "pip",
@@ -23,7 +25,8 @@ sp.run(
 )
 sp.run(["pip", "install", "./trackio/supporting/inpoly-python-0.2.0.zip"])
 
-# run step
+
+# run setup
 setup(
     name="trackio",
     version="0.1.0",
