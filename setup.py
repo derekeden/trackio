@@ -8,6 +8,7 @@ from setuptools import find_packages, setup
 
 # install numpy before rasterio to ensure <2.0
 sp.run(["pip", "install", "numpy<2.0"])
+
 # installed prepackaged wheels
 sp.run(
     [
@@ -24,7 +25,6 @@ sp.run(
     ]
 )
 sp.run(["pip", "install", "./trackio/supporting/inpoly-python-0.2.0.zip"])
-
 
 # run setup
 setup(
