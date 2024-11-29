@@ -24,7 +24,10 @@ sp.run(
         "./trackio/supporting/rasterio-1.3.9-cp310-cp310-win_amd64.whl",
     ]
 )
-sp.run(["pip", "install", "./trackio/supporting/inpoly-python-0.2.0.zip"])
+sp.run(
+    ["pip", "install", "./trackio/supporting/inpoly-python-0.2.0.zip"],
+    check=True,
+)
 
 # run setup
 setup(
