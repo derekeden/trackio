@@ -263,8 +263,10 @@ def clip_to_box(
     bbox,
     col_mapper=mappers.columns,
     out_path=".",
+    sep=",",
     ncores=1,
     pattern="_clipped",
+    keep_cols=[],
 ):
     """
     Clips data in a list of csv files to a user defined box, writes to clipped
@@ -304,6 +306,8 @@ def clip_to_box(
         poly=False,
         pattern=pattern,
         col_mapper=col_mapper,
+        sep=sep,
+        keep_cols=keep_cols,
     )
 
 
@@ -315,6 +319,7 @@ def clip_to_polygon(
     ncores=1,
     sep=",",
     pattern="_clipped",
+    keep_cols=[],
 ):
     """
     Clips data in a list of csv files to a user defined polygon, writes to
@@ -354,6 +359,7 @@ def clip_to_polygon(
         pattern=pattern,
         col_mapper=col_mapper,
         sep=sep,
+        keep_cols=keep_cols,
     )
 
 
@@ -366,6 +372,7 @@ def clip_to_shape(
     col_mapper=mappers.columns,
     sep=",",
     pattern="_clipped",
+    keep_cols=[],
 ):
     if ncores > len(files):
         ncores = len(files)
@@ -383,7 +390,9 @@ def clip_to_shape(
                 os.path.basename(raw_file).replace(".csv", f"{pattern}.csv"),
             )
         )
-    clip_func = partial(_clip_to_shape, extent, poly, col_mapper, sep)
+    clip_func = partial(
+        _clip_to_shape, extent, poly, col_mapper, sep, keep_cols
+    )
     args = list(zip(out_files, files))
     with mp.Pool(ncores) as pool:
         args = list(zip(out_files, files))
@@ -398,13 +407,17 @@ def clip_to_shape(
         )
 
 
-def _clip_to_shape(extent, poly, col_mapper, sep, out_file, raw_file):
+def _clip_to_shape(
+    extent, poly, col_mapper, sep, keep_cols, out_file, raw_file
+):
     print("Clipping", raw_file)
     cols = pd.read_csv(raw_file, nrows=0, sep=sep)
     # get standard cols and navstats
     new_cols = []
     for col in cols:
         new_cols.append(col_mapper.get(col, col))
+    # columns to keep
+    keep_cols = [k for k in keep_cols if k in new_cols]
     # read the data
     dat = pd.read_csv(raw_file, on_bad_lines="warn", sep=sep)
     if len(dat) == 0:
@@ -423,7 +436,7 @@ def _clip_to_shape(extent, poly, col_mapper, sep, out_file, raw_file):
             mask1 = (dat["X"] >= xmin) & (dat["X"] <= xmax)
             mask2 = (dat["Y"] >= ymin) & (dat["Y"] <= ymax)
             mask = mask1.values & mask2.values
-        dat[mask].to_csv(out_file)
+        dat[mask][keep_cols].to_csv(out_file, index=False)
 
 
 # Function to follow a chain from a starting point
