@@ -417,7 +417,10 @@ def _clip_to_shape(
     for col in cols:
         new_cols.append(col_mapper.get(col, col))
     # columns to keep
-    keep_cols = [k for k in keep_cols if k in new_cols]
+    if len(keep_cols) == 0:
+        keep_cols = new_cols
+    else:
+        keep_cols = [k for k in keep_cols if k in new_cols]
     # read the data
     dat = pd.read_csv(raw_file, on_bad_lines="warn", sep=sep)
     if len(dat) == 0:
