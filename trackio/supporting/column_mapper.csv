@@ -1,5 +1,5 @@
 Mapped,Raw
-Time,"['BaseDateTime', 'dt_pos_utc', 'DATE TIME (UTC)', 'Date time stamp', 'POSITION_UTC_DATE', 'Time', 'MovementDateTime']"
+Time,"['BaseDateTime', 'dt_pos_utc', 'DATE TIME (UTC)', 'Date time stamp', 'POSITION_UTC_DATE', 'Time', 'MovementDateTime', '# Timestamp']"
 X,"['X', 'Longitude', 'Lon', 'Longitude (DDD.ddd)', 'LONGITUDE', 'LON', 'longitude']"
 Y,"['Y', 'Latitude', 'Lat', 'Latitude (DD.ddd)', 'LATITUDE', 'LAT', 'latitude']"
 Draft,"['Draught', 'Draft', 'Max draught', 'DRAUGHT', 'draught']"
