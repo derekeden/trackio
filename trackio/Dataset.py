@@ -302,6 +302,7 @@ class Dataset:
         prefix="agent",
         ncores=1,
         sep=",",
+        format="%Y-%m-%d %H:%M:%S",
         desc="Grouping points",
     ):
         """
@@ -333,6 +334,7 @@ class Dataset:
             prefix (str): Prefix for output files. Defaults to 'agent'.
             ncores (int): Number of cores to use for processing. Defaults to 1.
             sep (str, optional): The separator of the csv file. Defaults to ','.
+            format (str, optional): The format of the time column, default is '%Y-%m-%d %H:%M:%S'.
             desc (str): Description of the operation. Defaults to 'Grouping
                         points'.
 
@@ -367,6 +369,7 @@ class Dataset:
             data_mappers,
             prefix,
             sep,
+            format,
         )
         # if any raw files
         if len(raw_files) > 0:

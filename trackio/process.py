@@ -33,6 +33,7 @@ def group_points(
     data_mappers,
     prefix,
     sep,
+    format,
     raw_file,
 ):
     # if it's a file
@@ -55,6 +56,7 @@ def group_points(
                 data_cols,
                 data_mappers,
                 prefix,
+                format,
             )
     # if raw dataframe
     if isinstance(raw_file, pd.DataFrame):
@@ -67,6 +69,7 @@ def group_points(
             data_cols,
             data_mappers,
             prefix,
+            format,
         )
 
 
@@ -79,6 +82,7 @@ def _group_points(
     data_cols,
     data_mappers,
     prefix,
+    format,
 ):
     # get process ID
     pid = mp.current_process().name.replace("SpawnPoolWorker-", "processor")
@@ -102,7 +106,7 @@ def _group_points(
     # filter the data
     dat = dat.filter(available_cols)
     # convert all strings to datetime
-    dat["Time"] = pd.to_datetime(dat["Time"])
+    dat["Time"] = pd.to_datetime(dat["Time"], format=format)
     # delete missing/nan critical columns
     dat = dat.dropna(subset=must_cols)
     # format any data columns that have mappers
@@ -281,6 +285,7 @@ def clip_to_box(
         out_path (str): Output path for clipped files. Defaults to '.'.
         ncores (int): Number of cores to use for processing. Defaults to 1.
         pattern (str): Suffix pattern for clipped file names. Defaults to '_clipped'.
+        keep_cols (list): List of raw data columns to maintain after clipping, if empty keeps all.
 
     Returns:
         None
@@ -335,6 +340,7 @@ def clip_to_polygon(
         ncores (int): Number of cores to use for processing. Defaults to 1.
         sep (str, optional): The separator of the csv file. Defaults to ','.
         pattern (str): Suffix pattern for clipped file names. Defaults to '_clipped'.
+        keep_cols (list): List of raw data columns to maintain after clipping, if empty keeps all.
 
     Returns:
         None
