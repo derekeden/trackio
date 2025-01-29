@@ -317,7 +317,7 @@ def _classify_touching(ls, geom, npts, segments=False):
         # keep both points of segments
         touches = np.nonzero(result)[0]
         touches = sorted(set(touches.tolist() + (touches + 1).tolist()))
-        result = np.zeros(result.shape).astype(bool)
+        result = np.zeros(result.shape[0] + 1).astype(bool)
         result[touches] = True
         # keep only end point of segments
         # result = np.concatenate([[False], result])
