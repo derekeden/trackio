@@ -314,7 +314,13 @@ def classify_trip(poly1, edges1, poly2, edges2, code, args):
 def _classify_touching(ls, geom, npts, segments=False):
     if segments:
         result = ls.apply(lambda x: geom.intersects(x)).values
-        result = np.concatenate([[False], result])
+        # keep both points of segments
+        touches = np.nonzero(result)[0]
+        touches = sorted(set(touches.tolist() + (touches + 1).tolist()))
+        result = np.zeros(result.shape).astype(bool)
+        result[touches] = True
+        # keep only end point of segments
+        # result = np.concatenate([[False], result])
         return result
     else:
         if geom.intersects(ls):

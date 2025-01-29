@@ -4194,6 +4194,7 @@ class Dataset:
     def classify_touching(
         self,
         geom,
+        segments=False,
         agents=None,
         tracks=None,
         ncores=1,
@@ -4215,6 +4216,8 @@ class Dataset:
 
         Args:
             geom: a shapely LineString, MultiLineString, Polygon, or MultiPolygon to check tracks against
+            segments: (bool, optional): If False, all points along the track will be classified as True if the track touches geom.
+                                        If True, only END points on segments touching geom will be classified as True.
             agents (list, optional): A list of agent IDs whose tracks will be analyzed for touching the specified geometry.
                                     If None, the classification considers all agents in the dataset.
             tracks (list, optional): A list of specific track IDs to be classified based on contact with the geometry.
@@ -4238,7 +4241,11 @@ class Dataset:
         )
         # process in parallel
         utils.pool_caller(
-            classify.classify_touching, (geom, code), pkl_groups, desc, ncores
+            classify.classify_touching,
+            (geom, code, segments),
+            pkl_groups,
+            desc,
+            ncores,
         )
         # update meta
         meta = "Touching object"
