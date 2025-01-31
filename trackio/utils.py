@@ -58,8 +58,21 @@ def save_pkl(pkl_file, pkl_obj):
         pkl.dump(pkl_obj, f)
 
 
+def most_likely_non_nan(df):
+    out = {}
+    for col in df.columns:
+        series = df[col]
+        most_likely = series.value_counts().sort_values()
+        if len(most_likely) > 0:
+            out[col] = most_likely.index[-1]
+        else:
+            out[col] = np.nan
+    return out
+
+
 def collect_agent_pkls(pkl_files) -> Agent:
     # loop over pkl files
+    metas = []
     i = 0
     for pkl_file in pkl_files:
         with open(pkl_file, "rb") as p:
@@ -75,8 +88,12 @@ def collect_agent_pkls(pkl_files) -> Agent:
                                 _tmp.data
                             )  # append the unsplit points
                         i += 1
+                        metas.append(_tmp.meta)
                 except EOFError:
                     break
+    # update metas incase they differed
+    meta = most_likely_non_nan(pd.DataFrame(metas))
+    agent.meta = meta
     return agent
 
 

@@ -73,6 +73,18 @@ def group_points(
         )
 
 
+def most_likely_non_nan(df):
+    out = {}
+    for col in df.columns:
+        series = df[col]
+        most_likely = series.value_counts().sort_values()
+        if len(most_likely) > 0:
+            out[col] = most_likely.index[-1]
+        else:
+            out[col] = np.nan
+    return out
+
+
 def _group_points(
     chunk,
     groupby,
@@ -107,8 +119,6 @@ def _group_points(
     dat = dat.filter(available_cols)
     # convert all strings to datetime
     dat["Time"] = pd.to_datetime(dat["Time"], format=format)
-    # delete missing/nan critical columns
-    dat = dat.dropna(subset=must_cols)
     # format any data columns that have mappers
     for col in dat.columns:
         if col in data_cols:
@@ -126,13 +136,19 @@ def _group_points(
         group = grouped[i]
         # get the groupby and agent id
         aid = f"{prefix}" + str(group[groupby].iloc[0])
-        # make meta and data
-        meta = group[meta_cols].iloc[0].to_dict()
-        data = pd.DataFrame(group[data_cols].to_dict(orient="list"))
-        agent = Agent(aid, meta, data)
-        # append the pickle
-        outfile = f"{out_path}/{aid}_{pid}.points"
-        utils.append_pkl(outfile, agent)
+        # fill meta with most likely non nan
+        meta = most_likely_non_nan(group[meta_cols])
+        # get data frame
+        data = group[data_cols].dropna(subset=must_cols).reset_index(drop=True)
+        # if there was no valid dynamic data
+        if len(data) == 0:
+            continue
+        else:
+            # make agent
+            agent = Agent(aid, meta, data)
+            # append agent to pickle
+            outfile = f"{out_path}/{aid}_{pid}.points"
+            utils.append_pkl(outfile, agent)
 
 
 def split_tracks_spatiotemporal(

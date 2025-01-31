@@ -302,7 +302,7 @@ class Dataset:
         prefix="agent",
         ncores=1,
         sep=",",
-        format="%Y-%m-%d %H:%M:%S",
+        format=None,
         desc="Grouping points",
     ):
         """
