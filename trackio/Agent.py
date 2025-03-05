@@ -205,8 +205,11 @@ class Agent:
             data = data.sort_values(by="Time").reset_index(drop=True)
             # split the data by changes in data column
             splitter = data[data_col].values
-            splits = np.diff(splitter)
-            split_ids = np.nonzero(splits)[0] + 1
+            # splits = np.diff(splitter)
+            # split_ids = np.nonzero(splits)[0] + 1
+            split_ids = (
+                np.nonzero(splitter[:-1] != splitter[1:])[0] + 1
+            )  # this handles strings too
             idxs = np.split(range(len(data)), split_ids)
             for idx in idxs:
                 split_tracks.append(
