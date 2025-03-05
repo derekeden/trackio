@@ -183,7 +183,10 @@ class Agent:
                 # split the data by changes in data column
                 splitter = track[data_col].values
                 splits = np.diff(splitter)
-                split_ids = np.nonzero(splits)[0] + 1
+                # split_ids = np.nonzero(splits)[0] + 1
+                split_ids = (
+                    np.nonzero(splitter[:-1] != splitter[1:])[0] + 1
+                )  # this handles strings too
                 idxs = np.split(range(len(track)), split_ids)
                 for idx in idxs:
                     split_tracks.append(
