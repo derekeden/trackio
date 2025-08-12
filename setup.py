@@ -33,6 +33,7 @@ sp.run(
 setup(
     name="trackio",
     version="0.1.0",
+    license="MIT",
     author="Derek J Eden",
     author_email="derekjeden@gmail.com",
     description="A python approach to working with mass movement data with big datasets and small computational power in mind.",
