@@ -1965,6 +1965,7 @@ class Dataset:
         ncores=1,
         out_path=None,
         method="middle",
+        data_col="Coursing",
         desc="Computing coursing",
     ):
         """
@@ -2015,14 +2016,14 @@ class Dataset:
         # recompute in parallel
         utils.pool_caller(
             geometry.compute_coursing,
-            (method, self.meta["CRS"], out_path),
+            (method, self.meta["CRS"], out_path, data_col),
             pkl_groups,
             desc,
             ncores,
         )
         # update meta
         meta = self.meta.copy()
-        meta["Coursing"] = "degrees"
+        meta[data_col] = "degrees"
         self = self._update_meta(out_path, meta)
         return self
 
@@ -2104,6 +2105,7 @@ class Dataset:
         ncores=1,
         out_path=None,
         method="middle",
+        data_col="Speed",
         desc="Computing speed",
     ):
         """
@@ -2153,14 +2155,14 @@ class Dataset:
         # recompute in parallel
         utils.pool_caller(
             geometry.compute_speed,
-            (method, out_path),
+            (method, out_path, data_col),
             pkl_groups,
             desc,
             ncores,
         )
         # update meta
         meta = self.meta.copy()
-        meta["Speed"] = f"{meta['X']}/second"
+        meta[data_col] = f"{meta['X']}/second"
         self = self._update_meta(out_path, meta)
         return self
 
@@ -2691,6 +2693,7 @@ class Dataset:
         tracks=None,
         ncores=1,
         out_path=None,
+        speed_col="Speed",
         desc="Simplifying stops along tracks",
     ):
         """
@@ -2737,7 +2740,13 @@ class Dataset:
         # resample in parallel
         utils.pool_caller(
             geometry.simplify_stops,
-            (stop_threshold, min_stop_duration, max_drift_distance, out_path),
+            (
+                stop_threshold,
+                min_stop_duration,
+                max_drift_distance,
+                out_path,
+                speed_col,
+            ),
             pkl_groups,
             desc,
             ncores,
@@ -4260,6 +4269,7 @@ class Dataset:
         tracks=None,
         ncores=1,
         code=22,
+        speed_col="Speed",
         desc="Classifying stopped tracks",
     ):
         """
@@ -4296,13 +4306,13 @@ class Dataset:
         # process in parallel
         utils.pool_caller(
             classify.classify_stops,
-            (stop_threshold, min_stop_duration, code),
+            (stop_threshold, min_stop_duration, code, speed_col),
             pkl_groups,
             desc,
             ncores,
         )
         # update meta
-        meta = f"Stopped: Speed <= {stop_threshold} and Duration >= {min_stop_duration}"
+        meta = f"Stopped: {speed_col} <= {stop_threshold} and Duration >= {min_stop_duration}"
         self.meta[f"Code{code}"] = meta
         return self
 

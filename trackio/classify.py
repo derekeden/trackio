@@ -386,7 +386,7 @@ def _classify_stops(time, speed, stop_threshold, min_stop_duration):
     return out
 
 
-def classify_stops(stop_threshold, min_stop_duration, code, args):
+def classify_stops(stop_threshold, min_stop_duration, code, speed_col, args):
     # split args
     pkl_files, tracks = args
     # read split agent file
@@ -403,7 +403,7 @@ def classify_stops(stop_threshold, min_stop_duration, code, args):
     # loop over each track
     for tid in tids:
         track = agent.tracks[tid]
-        speed = track["Speed"].values
+        speed = track[speed_col].values
         time = track["Time"]
         result = _classify_stops(
             time, speed, stop_threshold, min_stop_duration

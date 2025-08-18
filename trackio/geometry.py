@@ -412,7 +412,7 @@ def resample_time_global(time, out_path, args):
     save_pkl(out_file, agent)
 
 
-def compute_coursing(method, crs, out_path, args):
+def compute_coursing(method, crs, out_path, data_col, args):
     # split args
     pkl_files, tracks = args
     # read split agent file
@@ -436,7 +436,7 @@ def compute_coursing(method, crs, out_path, args):
             coursing = points_to_coursing(
                 track["X"].values, track["Y"].values, crs, method
             )
-        track.loc[:, "Coursing"] = coursing
+        track.loc[:, data_col] = coursing
     # save the agent back
     out_file = f"{out_path}/{os.path.basename(pkl_files[0])}"
     save_pkl(out_file, agent)
@@ -480,7 +480,7 @@ def compute_turning_rate(method, out_path, args):
     save_pkl(out_file, agent)
 
 
-def compute_speed(method, out_path, args):
+def compute_speed(method, out_path, data_col, args):
     # split args
     pkl_files, tracks = args
     # read split agent file
@@ -514,7 +514,7 @@ def compute_speed(method, out_path, args):
                 speed1 = np.hstack([speed, speed[-1:]])
                 speed2 = np.hstack([speed[:1], speed])
                 speed = (speed1 + speed2) / 2
-        track.loc[:, "Speed"] = speed
+        track.loc[:, data_col] = speed
     # save the agent back
     out_file = f"{out_path}/{os.path.basename(pkl_files[0])}"
     save_pkl(out_file, agent)
@@ -930,7 +930,12 @@ def characteristic_tracks(
 
 
 def simplify_stops(
-    stop_threshold, min_stop_duration, max_drift_distance, out_path, args
+    stop_threshold,
+    min_stop_duration,
+    max_drift_distance,
+    out_path,
+    speed_col,
+    args,
 ):
     # split args
     pkl_files, tracks = args
@@ -959,7 +964,7 @@ def simplify_stops(
                 track["X"],
                 track["Y"],
                 track["Time"],
-                track["Speed"],
+                track[speed_col],
                 stop_threshold,
                 min_stop_duration,
                 max_drift_distance,
