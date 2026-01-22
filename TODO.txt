@@ -1,3 +1,5 @@
 make sure out_path working correctly on all functions - update docs
 make sure computed data_cols working on all functions - update docs
 pre processing scan to get unique identifiers
+make copy to function whole dataset
+make in memory function to speed things up

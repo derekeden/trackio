@@ -2032,6 +2032,7 @@ class Dataset:
         agents=None,
         tracks=None,
         ncores=1,
+        direction_col="Coursing",
         out_path=None,
         method="middle",
         desc="Computing turning rate",
@@ -2087,7 +2088,7 @@ class Dataset:
         # recompute in parallel
         utils.pool_caller(
             geometry.compute_turning_rate,
-            (method, out_path),
+            (method, direction_col, out_path),
             pkl_groups,
             desc,
             ncores,
@@ -2253,9 +2254,9 @@ class Dataset:
         points to use for calculating timestep values, and how to fill the remaining point.
 
         If 'forward', the timestep size at each point is calculated by comparing its timestamp to the next point.
-        The first point on the track then gets filled a np.nan value.
+        The last point on the track then gets filled a np.nan value.
 
-        If 'backward', it uses the current point and the previous point, and the last point gets filled with
+        If 'backward', it uses the current point and the previous point, and the first point gets filled with
         np.nan.
 
         If you pass a directory for the out_path kwarg, the *.tracks files will be saved to this directory,
@@ -2760,6 +2761,7 @@ class Dataset:
         shape,
         agents=None,
         tracks=None,
+        data_col="Imprinted",
         ncores=1,
         out_path=None,
         desc="Imprinting geometry into tracks",
@@ -2788,6 +2790,8 @@ class Dataset:
                                     allows for selective application of the geometry to certain tracks. If None,
                                     the operation applies to tracks related to the specified agents or all tracks
                                     if no agents are specified.
+            data_col (str, optional): A dynamic data column with this name will be added to the tracks where each original
+                                     point will be False, and all imprinted points will be True.
             ncores (int, optional): The number of processing cores to use for the operation. Defaults to 1.
             out_path (str, optional): The file path where the dataset with the imprinted geometric information
                                     should be saved. If None, it assumes the current data_path.
@@ -2811,7 +2815,7 @@ class Dataset:
         # resample in parallel
         utils.pool_caller(
             geometry.imprint_geometry,
-            (polylines, out_path),
+            (polylines, data_col, out_path),
             pkl_groups,
             desc,
             ncores,
@@ -4226,7 +4230,7 @@ class Dataset:
         Args:
             geom: a shapely LineString, MultiLineString, Polygon, or MultiPolygon to check tracks against
             segments: (bool, optional): If False, all points along the track will be classified as True if the track touches geom.
-                                        If True, only END points on segments touching geom will be classified as True.
+                                        If True, BOTH points on segments touching geom will be classified as True.
             agents (list, optional): A list of agent IDs whose tracks will be analyzed for touching the specified geometry.
                                     If None, the classification considers all agents in the dataset.
             tracks (list, optional): A list of specific track IDs to be classified based on contact with the geometry.
@@ -4389,8 +4393,9 @@ def _meta_to_tracks(meta, crs):
         # _ids = [f"{vid}_{tid}" for tid in vmeta["Tracks"].keys()]
         # get the combined track meta rows
         _vmeta = {k: v for k, v in vmeta.items() if k != "Tracks"}
+        __vmeta = {k: v for k, v in _vmeta.items() if "Code" not in k}
         tmeta = [
-            {**_vmeta, **vmeta["Tracks"][tid]}
+            {**__vmeta, **vmeta["Tracks"][tid]}
             for tid in vmeta["Tracks"].keys()
         ]
         # ids.extend(_ids)

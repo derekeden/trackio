@@ -23,7 +23,7 @@ def to_track_gdf(agent, track, tid, code):
         )
     # if returning split multilinestring of only coded parts
     else:
-        mask = track[f"Code{code}"]
+        mask = track[f"Code{code}"].eq(True)
         diffs = np.diff(mask)
         # if all points meet codemask criteria
         if np.sum(diffs) == 0 and np.all(mask):
@@ -78,7 +78,7 @@ def to_segment_gdf(agent, track, tid, code, method):
         # check if it meets the codemask
         if code is not None:
             # if neither part of segment passes
-            if not subtrack[f"Code{code}"].any():
+            if not (subtrack[f"Code{code}"].eq(True)).any():
                 continue
         # make segment linestring
         linestring = LineString(subtrack[["X", "Y"]])
@@ -140,7 +140,7 @@ def to_gdf(code, segments, method, args):
         # skip if doesnt have the code
         if code is not None:
             # if 1 or less points
-            if len(track[track[f"Code{code}"]]) < 2:
+            if len(track[track[f"Code{code}"].eq(True)]) < 2:
                 continue
         if segments:
             meta = to_segment_gdf(agent, track, tid, code, method)
@@ -173,7 +173,9 @@ def to_df(code, args):
         track_id = agent.track_meta[tid]["Track ID"]
         # get rid of codes
         if code is not None:
-            track = track[track[f"Code{code}"]].copy()  # copy? wtf? why
+            track = track[
+                track[f"Code{code}"].eq(True)
+            ].copy()  # copy? wtf? why
         # if nothing left
         if len(track) < 1:
             continue

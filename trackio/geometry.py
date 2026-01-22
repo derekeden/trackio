@@ -442,7 +442,7 @@ def compute_coursing(method, crs, out_path, data_col, args):
     save_pkl(out_file, agent)
 
 
-def compute_turning_rate(method, out_path, args):
+def compute_turning_rate(method, direction_col, out_path, args):
     # split args
     pkl_files, tracks = args
     # read split agent file
@@ -456,14 +456,14 @@ def compute_turning_rate(method, out_path, args):
         ]
     else:
         tids = agent.tracks.keys()
-    # loop over each track, recompute coursing
+    # loop over each track, compute turning rate
     for tid in tids:
         track = agent.tracks[tid]
         if len(track) == 1:
             turn = [np.nan]
         else:
-            coursing = track["Coursing"].values
-            dc = np.diff(coursing)
+            direction = track[direction_col].values
+            dc = np.diff(direction)
             dt = np.diff(track["Time"].values) / np.timedelta64(1, "s")
             turn = dc / dt
             if method == "forward":
@@ -1611,7 +1611,7 @@ def line_intersection(line1, line2):
         return None
 
 
-def imprint_geometry(polylines, out_path, args):
+def imprint_geometry(polylines, data_col, out_path, args):
     # split args
     pkl_files, tracks = args
     # read split agent file
@@ -1694,6 +1694,8 @@ def imprint_geometry(polylines, out_path, args):
                 )
                 add_track["X"] = add_df["X"].values
                 add_track["Y"] = add_df["Y"].values
+                track[data_col] = False
+                add_track[data_col] = True
                 new_track = (
                     pd.concat([track, add_track])
                     .sort_values(by="Time")
