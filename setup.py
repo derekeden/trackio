@@ -6,7 +6,7 @@ from setuptools import find_packages, setup
 
 ################################################################################
 
-BASE_DIR = Path(__file__).resolve()
+BASE_DIR = Path(__file__).resolve().parent
 
 # run setup
 setup(
@@ -34,9 +34,9 @@ setup(
         "dask==2024.2.1",
         "matplotlib",
         "PyQt5",
-        f"GDAL @ file://{BASE_DIR / 'trackio/supporting/GDAL-3.8.4-cp310-cp310-win_amd64.whl'}",
-        f"rasterio @ file://{BASE_DIR / 'trackio/supporting/rasterio-1.3.9-cp310-cp310-win_amd64.whl'}",
-        f"inpoly @ file://{BASE_DIR / 'trackio/supporting/inpoly-0.2.0-cp310-cp310-win_amd64.whl'}",
+        f"GDAL @ file://{BASE_DIR / 'trackio/trackio/supporting/GDAL-3.8.4-cp310-cp310-win_amd64.whl'}",
+        f"rasterio @ file://{BASE_DIR / 'trackio/trackio/supporting/rasterio-1.3.9-cp310-cp310-win_amd64.whl'}",
+        f"inpoly @ file://{BASE_DIR / 'trackio/trackio/supporting/inpoly-0.2.0-cp310-cp310-win_amd64.whl'}",
     ],
 )
 
