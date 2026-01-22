@@ -6,7 +6,7 @@ from setuptools import find_packages, setup
 
 ################################################################################
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve()
 
 # run setup
 setup(
