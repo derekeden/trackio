@@ -62,10 +62,9 @@ If using Anaconda/Miniconda, run this from the `trackio` folder:
 
 `conda activate trackio`
 
-`pip install .` 
+`pip install git+https://github.com/derekeden/trackio.git` 
 
-**Please note for the `inpoly` library, it requires Visual Studio C++ Dev Tools for Windows. If you don't have it already,**
-**the link will be in the error message, just follow the instructions to download then redo the trackio installation.**
+**If something goes wrong installing the `inpoly` library on  Windows, then you require Visual Studio C++ Dev Tools. The link will be in the error message, just follow the instructions to download then redo the trackio installation.**
 
 ## Data Structures
 
@@ -203,7 +202,7 @@ Currently, this repository is utilizing pre-commit functionality to maintain for
 
 To contribute to the repository, please install the `pre-commit` library so the existing pre-commit hooks automatically run.
 
-From the root `trackio` folder, run:
+From the cloned `trackio` root folder, run:
 
 `pip install pre-commit` 
 
