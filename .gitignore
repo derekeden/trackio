@@ -5,4 +5,5 @@ trackio/supporting/*.pptx
 trackio.egg-info/
 build/
 *.gpkg
+!notebooks/example2_ABM_output/polygons.gpkg
 notebooks/example3_Canada_Goose_migrations/North-East American Canada goose migration 2015-2021.csv
