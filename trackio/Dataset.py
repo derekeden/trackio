@@ -4393,7 +4393,8 @@ def _meta_to_tracks(meta, crs):
         # _ids = [f"{vid}_{tid}" for tid in vmeta["Tracks"].keys()]
         # get the combined track meta rows
         _vmeta = {k: v for k, v in vmeta.items() if k != "Tracks"}
-        __vmeta = {k: v for k, v in _vmeta.items() if "Code" not in k}
+        __vmeta = {k: v for k, v in _vmeta.items() if 
+                   re.search(r'^Code\d+$', k) is None}
         tmeta = [
             {**__vmeta, **vmeta["Tracks"][tid]}
             for tid in vmeta["Tracks"].keys()
