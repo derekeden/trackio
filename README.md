@@ -64,8 +64,6 @@ If using Anaconda/Miniconda, run this from the `trackio` folder:
 
 `pip install git+https://github.com/derekeden/trackio.git` 
 
-**If something goes wrong installing the `inpoly` library on  Windows, then you require Visual Studio C++ Dev Tools. The link will be in the error message, just follow the instructions to download then redo the trackio installation.**
-
 ## Data Structures
 
 The `trackio` library is structured so `Dataset` is the main class that you interface with. The `Dataset` class is a custom class that contains references to stored data, metadata about this data, and a series of attributes and methods that make it easy to operate on the data. 
