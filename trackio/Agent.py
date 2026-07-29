@@ -151,9 +151,9 @@ class Agent:
                 # save track data
                 self.tracks[f"T{j}"] = keep_tracks[i]
                 track_meta[f"T{j}"] = gen_track_meta(keep_tracks[i])
-                track_meta[f"T{j}"][
-                    "Track ID"
-                ] = f"{self.meta['Agent ID']}_T{j}"
+                track_meta[f"T{j}"]["Track ID"] = (
+                    f"{self.meta['Agent ID']}_T{j}"
+                )
         # update the track meta
         self.track_meta = track_meta
         # add the agent meta
@@ -232,9 +232,9 @@ class Agent:
                 # save track data
                 self.tracks[f"T{j}"] = keep_tracks[i]
                 track_meta[f"T{j}"] = gen_track_meta(keep_tracks[i])
-                track_meta[f"T{j}"][
-                    "Track ID"
-                ] = f"{self.meta['Agent ID']}_T{j}"
+                track_meta[f"T{j}"]["Track ID"] = (
+                    f"{self.meta['Agent ID']}_T{j}"
+                )
         # update the track meta
         self.track_meta = track_meta
         # add the agent meta
@@ -329,9 +329,9 @@ class Agent:
                     n_clusters, inertia, curve="convex", direction="decreasing"
                 )
                 optimal_id = kneedle.knee
-        assert isinstance(
-            optimal_id, int
-        ), "could not find an optimal n_clusters value"
+        assert isinstance(optimal_id, int), (
+            "could not find an optimal n_clusters value"
+        )
         # get labels
         labels = clusters[optimal_id]
         uniq_labels = np.unique(labels)
@@ -356,9 +356,9 @@ class Agent:
                 # save track data
                 self.tracks[f"T{j}"] = keep_tracks[i]
                 track_meta[f"T{j}"] = gen_track_meta(keep_tracks[i])
-                track_meta[f"T{j}"][
-                    "Track ID"
-                ] = f"{self.meta['Agent ID']}_T{j}"
+                track_meta[f"T{j}"]["Track ID"] = (
+                    f"{self.meta['Agent ID']}_T{j}"
+                )
         # update the track meta
         self.track_meta = track_meta
         # add the agent meta
@@ -444,9 +444,9 @@ class Agent:
                 # save track data
                 self.tracks[f"T{j}"] = keep_tracks[i]
                 track_meta[f"T{j}"] = gen_track_meta(keep_tracks[i])
-                track_meta[f"T{j}"][
-                    "Track ID"
-                ] = f"{self.meta['Agent ID']}_T{j}"
+                track_meta[f"T{j}"]["Track ID"] = (
+                    f"{self.meta['Agent ID']}_T{j}"
+                )
         # update the track meta
         self.track_meta = track_meta
         # add the agent meta
@@ -457,6 +457,51 @@ class Agent:
 
 
 ###############################################################################
+
+
+def gen_segment_meta(tdf):
+    dts = tdf["Time"].diff().dt.total_seconds().values[1:].astype(int)
+    dxs = (
+        ((tdf[["X", "Y"]].values[1:] - tdf[["X", "Y"]].values[:-1]) ** 2).sum(
+            axis=1
+        )
+    ) ** 0.5
+    xs = np.array([tdf["X"].values[:-1], tdf["X"].values[1:]]).T
+    ys = np.array([tdf["Y"].values[:-1], tdf["Y"].values[1:]]).T
+    codes = {}
+    code_cols = tdf.filter(like="Code").columns
+    for col in code_cols:
+        cs = np.array([tdf[col].values[:-1], tdf[col].values[1:]]).T
+        codes[col] = cs
+    segment_meta = pd.DataFrame(index=range(len(tdf) - 1))
+    segment_meta["Track Length"] = dxs
+    segment_meta["npoints"] = 2
+    segment_meta["Start Time"] = tdf["Time"].iloc[:-1]
+    segment_meta["End Time"] = tdf["Time"].iloc[1:].reset_index(drop=True)
+    segment_meta["Duration"] = dts
+    segment_meta["Year"] = segment_meta["Start Time"].dt.year
+    segment_meta["Month"] = segment_meta["Start Time"].dt.month
+    segment_meta["Xmin"] = xs.min(axis=1)
+    segment_meta["Xmax"] = xs.max(axis=1)
+    segment_meta["Ymin"] = ys.min(axis=1)
+    segment_meta["Ymax"] = ys.max(axis=1)
+    segment_meta["Xstart"] = xs[:, 0]
+    segment_meta["Ystart"] = ys[:, 0]
+    segment_meta["Xend"] = xs[:, 1]
+    segment_meta["Yend"] = ys[:, 1]
+    segment_meta["Effective Distance"] = dxs
+    segment_meta["Min Temporal Resolution"] = dts
+    segment_meta["Mean Temporal Resolution"] = dts
+    segment_meta["Max Temporal Resolution"] = dts
+    segment_meta["Min Spatial Resolution"] = dxs
+    segment_meta["Mean Spatial Resolution"] = dxs
+    segment_meta["Max Spatial Resolution"] = dxs
+    for col in code_cols:
+        segment_meta[col] = codes[col].any(axis=1)
+    segment_meta["Sinuosity"] = (
+        segment_meta["Track Length"] / segment_meta["Effective Distance"]
+    )
+    return segment_meta
 
 
 # generate the metadata

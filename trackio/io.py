@@ -9,8 +9,10 @@ from pyproj import CRS
 from rasterio.transform import Affine
 from shapely.geometry import LineString, MultiLineString
 
-from .Agent import gen_track_meta
+from .Agent import gen_track_meta, gen_segment_meta
 from .utils import collect_agent_pkls
+from shapely import linestrings
+from pandas.api.types import is_numeric_dtype
 
 ###############################################################################
 
@@ -65,6 +67,36 @@ def to_track_gdf(agent, track, tid, code):
     meta.update(**agent.track_meta[tid].copy())
     meta["geometry"] = linestring
     return [meta]
+
+
+def to_segment_gdf_new(code, method, track):
+    # get track id
+    track_id = track["Track ID"].iloc[0]
+
+    coords = track[["X", "Y"]].values
+    segments = linestrings(np.stack([coords[:-1], coords[1:]], axis=1))
+    segment_meta = gen_segment_meta(track)
+    segment_meta["geometry"] = segments
+    segment_meta["Segment ID"] = [
+        f"{track_id}_S{i}" for i in range(len(segments))
+    ]
+    for col in track.columns:
+        if (
+            col not in ["Time", "X", "Y"]
+            and col not in segment_meta.columns
+            and is_numeric_dtype(track.dtypes[col])
+        ):
+            if method == "forward":
+                segment_meta[col] = track[col].values[:-1]
+            elif method == "backward":
+                segment_meta[col] = track[col].values[1:]
+            else:
+                segment_meta[col] = (
+                    track[col].values[:-1] + track[col].values[1:]
+                ) / 2
+    if code is not None:
+        segment_meta = segment_meta[segment_meta[f"Code{code}"].eq(True)]
+    return segment_meta
 
 
 def to_segment_gdf(agent, track, tid, code, method):
@@ -127,7 +159,7 @@ def to_gdf(code, segments, method, args):
         tids = [
             tid
             for tid in agent.tracks.keys()
-            if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks
+            if f"{agent.agent_meta['Agent ID']}_{tid}" in tracks
         ]
     else:
         tids = agent.tracks.keys()
@@ -163,7 +195,7 @@ def to_df(code, args):
         tids = [
             tid
             for tid in agent.tracks.keys()
-            if f'{agent.agent_meta["Agent ID"]}_{tid}' in tracks
+            if f"{agent.agent_meta['Agent ID']}_{tid}" in tracks
         ]
     else:
         tids = agent.tracks.keys()

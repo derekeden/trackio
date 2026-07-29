@@ -42,7 +42,6 @@ dataset_meta = "dataset.db"
 
 
 class Dataset:
-
     def __init__(
         self,
         data_path="./data",
@@ -1020,9 +1019,9 @@ class Dataset:
         # process metadata in parallel
         iterable = self.status["Unsplit"] + self.status["Split"]
         # assert there's even data
-        assert (
-            len(iterable) > 0
-        ), f"No point or track files in {self.data_path}"
+        assert len(iterable) > 0, (
+            f"No point or track files in {self.data_path}"
+        )
         meta_metacols_datacols = utils.pool_caller(
             _refresh_meta, (agents_only,), iterable, desc, ncores
         )
@@ -1611,6 +1610,18 @@ class Dataset:
         if segments:
             msg = "method must be backward, middle, or forward"
             assert method in ["backward", "middle", "forward"], msg
+            df = self.to_df(ncores=ncores, agents=agents, tracks=tracks)
+            uniqs = df["Track ID"].ne(df["Track ID"].shift()).cumsum()
+            groups = [g for _, g in df.groupby(uniqs)]
+            rows = utils.pool_caller(
+                io.to_segment_gdf_new, (code, method), groups, desc, ncores
+            )
+            rows = pd.concat(rows)
+            gdf = gp.GeoDataFrame(
+                rows, crs=self.meta["CRS"], geometry="geometry"
+            )
+            gdf.index = gdf["Segment ID"].values
+            return gdf
         # get the files to process
         pkl_groups = list(
             zip(*self._get_files_tracks_to_process(agents, tracks))
@@ -2959,9 +2970,9 @@ class Dataset:
         # if no input, self encounters
         if dataset is None:
             dataset = self.copy()
-        assert (
-            self.meta["CRS"] == dataset.meta["CRS"]
-        ), "CRS does not match between Datasets"
+        assert self.meta["CRS"] == dataset.meta["CRS"], (
+            "CRS does not match between Datasets"
+        )
         # get the two track databases
         db1 = self.tracks
         db2 = dataset.tracks
@@ -3084,9 +3095,9 @@ class Dataset:
         # if no input, self intersection
         if dataset is None:
             dataset = self.copy()
-        assert (
-            self.meta["CRS"] == dataset.meta["CRS"]
-        ), "CRS does not match between DataSets"
+        assert self.meta["CRS"] == dataset.meta["CRS"], (
+            "CRS does not match between DataSets"
+        )
         # get the two track databases
         db1 = self.tracks
         db2 = dataset.tracks
@@ -3286,9 +3297,9 @@ class Dataset:
         # if no input, self encounters
         if dataset is None:
             dataset = self.copy()
-        assert (
-            self.meta["CRS"] == dataset.meta["CRS"]
-        ), "CRS does not match between Datasets"
+        assert self.meta["CRS"] == dataset.meta["CRS"], (
+            "CRS does not match between Datasets"
+        )
         # ensure relative is False if no bins
         if bins is None:
             relative = False
@@ -3615,6 +3626,12 @@ class Dataset:
         # flatten and convert to dataframe
         rows = utils.flatten(rows)
         df = pd.DataFrame(rows)
+        # drop any outside the flow grid
+        df = df[
+            (df["Start"].isin(polygons["Code"].values))
+            & (df["End"].isin(polygons["Code"].values))
+        ]
+        # group by routes
         df = df.groupby(["Start", "End"]).agg(list)
         df["Volume"] = df["Track ID"].apply(len)
         # add the linestrings
@@ -4035,7 +4052,7 @@ class Dataset:
             ncores,
         )
         # update meta
-        meta = f'Speed {">=" if higher else "<="} {speed}'
+        meta = f"Speed {'>=' if higher else '<='} {speed}"
         self.meta[f"Code{code}"] = meta
         return self
 
@@ -4142,7 +4159,7 @@ class Dataset:
             ncores,
         )
         # update meta
-        meta = f'Speed {">=" if higher else "<="} {speed} inside Polygon'
+        meta = f"Speed {'>=' if higher else '<='} {speed} inside Polygon"
         self.meta[f"Code{code}"] = meta
         return self
 
@@ -4393,8 +4410,11 @@ def _meta_to_tracks(meta, crs):
         # _ids = [f"{vid}_{tid}" for tid in vmeta["Tracks"].keys()]
         # get the combined track meta rows
         _vmeta = {k: v for k, v in vmeta.items() if k != "Tracks"}
-        __vmeta = {k: v for k, v in _vmeta.items() if 
-                   re.search(r'^Code\d+$', k) is None}
+        __vmeta = {
+            k: v
+            for k, v in _vmeta.items()
+            if re.search(r"^Code\d+$", k) is None
+        }
         tmeta = [
             {**__vmeta, **vmeta["Tracks"][tid]}
             for tid in vmeta["Tracks"].keys()
